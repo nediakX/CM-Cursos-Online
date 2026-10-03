@@ -1,5 +1,5 @@
 import type { Curso, Evaluacion, Modulo } from '../types';
-import { CONTENIDO_MODULOS } from './modulos';
+import { CONTENIDO_MODULOS } from './modulos/index.js';
 
 /**
  * Datos del curso. Las lecciones y contenidos de cada módulo se derivan del

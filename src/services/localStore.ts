@@ -1,10 +1,13 @@
 /**
- * Almacén local (localStorage) para usar la plataforma sin backend.
- * Sólo lo usa api.ts cuando LOCAL_MODE está activo (no se definió VITE_API_URL).
+ * Lógica de negocio de la plataforma + almacén de datos.
  *
- * IMPORTANTE: los datos viven en el navegador de cada persona. Sirve para
- * demostraciones y pruebas en un mismo equipo; para clases reales con varios
- * alumnos conecta un backend (ver services/api.ts).
+ * - En el navegador (modo local, sin VITE_API_URL) guarda todo en localStorage.
+ * - En el servidor (api/index.ts) se usa el MISMO código, pero el almacén se
+ *   reemplaza con `configurarAlmacen()` para leer y escribir en Postgres, y las
+ *   contraseñas se guardan cifradas con `configurarPasswords()`.
+ *
+ * Por eso este archivo no debe usar APIs exclusivas del navegador fuera del
+ * almacén por defecto, y sus imports llevan extensión `.js` (requisito de Node).
  */
 import type {
   Asistencia,
@@ -21,26 +24,27 @@ import type {
   PreguntaSinRespuesta,
   Progreso,
   ResultadoIntento,
+  MetricasAdmin,
   User,
   UserRole,
   ContenidoModulo,
   SiteConfig,
   Solicitud,
 } from '../types';
-import { CURSO, EVALUACIONES } from '../data/curso';
-import { PREGUNTAS } from '../data/preguntas';
-import { CONTENIDO_MODULOS } from '../data/modulos';
-import { completarSitio } from '../data/sitio';
+import { CURSO, EVALUACIONES } from '../data/curso.js';
+import { PREGUNTAS } from '../data/preguntas.js';
+import { CONTENIDO_MODULOS } from '../data/modulos/index.js';
+import { completarSitio } from '../data/sitio.js';
 
 const KEY = 'lms_local_db_v1';
 const PW_OVERRIDE_KEY = 'lms_local_pw'; // versiones anteriores guardaban aquí los cambios de contraseña
 
-interface CuentaLocal {
+export interface CuentaLocal {
   user: User;
   password: string;
 }
 
-interface Db {
+export interface Db {
   progreso: Record<string, string[]>; // userId -> lecciones completadas
   intentos: Intento[];
   sesiones: Record<string, { userId: string; evaluacionId: string; preguntaIds: string[]; inicio?: string }>;
@@ -61,7 +65,7 @@ interface Db {
   solicitudes: Solicitud[];
 }
 
-const vacia = (): Db => ({
+export const vacia = (): Db => ({
   progreso: {},
   intentos: [],
   sesiones: {},
@@ -82,26 +86,70 @@ const vacia = (): Db => ({
   solicitudes: [],
 });
 
-function leer(): Db {
-  try {
-    return { ...vacia(), ...JSON.parse(localStorage.getItem(KEY) ?? '{}') };
-  } catch {
-    return vacia();
-  }
+/** De dónde se leen y dónde se guardan los datos. */
+export interface Almacen {
+  leer(): Db;
+  guardar(db: Db): void;
 }
-const guardar = (db: Db): void => {
-  try {
-    localStorage.setItem(KEY, JSON.stringify(db));
-  } catch {
-    // Almacenamiento lleno (p. ej. imágenes muy pesadas) o bloqueado.
-    throw new Error('ALMACENAMIENTO_LLENO');
-  }
+
+const almacenNavegador: Almacen = {
+  leer() {
+    try {
+      return { ...vacia(), ...JSON.parse(localStorage.getItem(KEY) ?? '{}') };
+    } catch {
+      return vacia();
+    }
+  },
+  guardar(db) {
+    try {
+      localStorage.setItem(KEY, JSON.stringify(db));
+    } catch {
+      // Almacenamiento lleno (p. ej. imágenes muy pesadas) o bloqueado.
+      throw new Error('ALMACENAMIENTO_LLENO');
+    }
+  },
+};
+
+let almacen: Almacen = almacenNavegador;
+/** Reemplaza el almacén (lo usa el servidor para trabajar sobre Postgres). */
+export const configurarAlmacen = (a: Almacen): void => {
+  almacen = a;
+};
+
+const leer = (): Db => almacen.leer();
+const guardar = (db: Db): void => almacen.guardar(db);
+
+// --- Contraseñas ------------------------------------------------------------
+// En el navegador se comparan tal cual (modo demostración). El servidor las
+// reemplaza por un hash seguro y define sus propias cuentas iniciales.
+interface PoliticaPasswords {
+  cifrar(plana: string): string;
+  verificar(plana: string, guardada: string): boolean;
+  generarTemporal(): string;
+  cuentasIniciales(): CuentaLocal[];
+}
+let passwords: PoliticaPasswords = {
+  cifrar: (p) => p,
+  verificar: (p, g) => p === g,
+  generarTemporal: () => `Cm${Math.random().toString(36).slice(2, 8)}${Math.floor(Math.random() * 90 + 10)}!`,
+  cuentasIniciales: () => {
+    let overrides: Record<string, string> = {};
+    try {
+      overrides = JSON.parse(localStorage.getItem(PW_OVERRIDE_KEY) ?? '{}');
+    } catch {
+      /* sin overrides */
+    }
+    return CUENTAS_INICIALES.map((c) => ({ user: { ...c.user }, password: overrides[c.user.id] ?? c.password }));
+  },
+};
+export const configurarPasswords = (p: Partial<PoliticaPasswords>): void => {
+  passwords = { ...passwords, ...p };
 };
 
 export const idLocal = (): string => `l-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
 // --- Usuarios ---------------------------------------------------------------
-const CUENTAS_INICIALES: CuentaLocal[] = [
+export const CUENTAS_INICIALES: CuentaLocal[] = [
   {
     password: 'Admin1234!',
     user: {
@@ -140,13 +188,7 @@ export const normalizarRut = (rut: string): string => rut.replace(/[^0-9kK]/g, '
 
 function cuentas(db: Db): CuentaLocal[] {
   if (db.usuarios) return db.usuarios;
-  let overrides: Record<string, string> = {};
-  try {
-    overrides = JSON.parse(localStorage.getItem(PW_OVERRIDE_KEY) ?? '{}');
-  } catch {
-    /* sin overrides */
-  }
-  db.usuarios = CUENTAS_INICIALES.map((c) => ({ user: { ...c.user }, password: overrides[c.user.id] ?? c.password }));
+  db.usuarios = passwords.cuentasIniciales();
   return db.usuarios;
 }
 
@@ -160,7 +202,7 @@ export const getUsuario = (id: string): User => {
 
 export const loginLocal = (rut: string, password: string): User => {
   const c = cuentas(leer()).find((x) => normalizarRut(x.user.rut) === normalizarRut(rut));
-  if (!c || c.password !== password) throw new Error('CREDENCIALES_INVALIDAS');
+  if (!c || !passwords.verificar(password, c.password)) throw new Error('CREDENCIALES_INVALIDAS');
   if (!c.user.activo) throw new Error('USUARIO_DESACTIVADO');
   return c.user;
 };
@@ -168,8 +210,8 @@ export const loginLocal = (rut: string, password: string): User => {
 export const cambiarPasswordLocal = (id: string, actual: string, nueva: string): void => {
   const db = leer();
   const c = cuentas(db).find((x) => x.user.id === id);
-  if (!c || c.password !== actual) throw new Error('CREDENCIALES_INVALIDAS');
-  c.password = nueva;
+  if (!c || !passwords.verificar(actual, c.password)) throw new Error('CREDENCIALES_INVALIDAS');
+  c.password = passwords.cifrar(nueva);
   c.user.debeCambiarPassword = false;
   guardar(db);
 };
@@ -205,7 +247,7 @@ export const crearUsuario = (data: Partial<User> & { password: string }): User =
     cursosAsignados: data.cursosAsignados ?? [CURSO.id],
     creadoEn: new Date().toISOString(),
   };
-  lista.push({ user, password: data.password });
+  lista.push({ user, password: passwords.cifrar(data.password) });
   guardar(db);
   return user;
 };
@@ -232,8 +274,8 @@ export const resetearPassword = (id: string): string => {
   const db = leer();
   const c = cuentas(db).find((x) => x.user.id === id);
   if (!c) throw new Error('HTTP_404');
-  const pw = `Cm${Math.random().toString(36).slice(2, 8)}${Math.floor(Math.random() * 90 + 10)}!`;
-  c.password = pw;
+  const pw = passwords.generarTemporal();
+  c.password = passwords.cifrar(pw);
   c.user.debeCambiarPassword = true;
   guardar(db);
   return pw;
@@ -716,3 +758,95 @@ export const eliminarSolicitud = (id: string): void => {
   db.solicitudes = db.solicitudes.filter((s) => s.id !== id);
   guardar(db);
 };
+
+// --- Operaciones compuestas (las usan el modo local y el servidor) ---------
+export const crearUsuariosMasivo = (
+  data: (Partial<User> & { password: string })[],
+): { exitosos: User[]; errores: { rut: string; motivo: string }[] } => {
+  const exitosos: User[] = [];
+  const errores: { rut: string; motivo: string }[] = [];
+  for (const d of data) {
+    try {
+      exitosos.push(crearUsuario(d));
+    } catch (e) {
+      errores.push({ rut: d.rut ?? '', motivo: e instanceof Error && e.message === 'RUT_DUPLICADO' ? 'RUT duplicado' : 'Datos inválidos' });
+    }
+  }
+  return { exitosos, errores };
+};
+
+export const listarTodosCertificados = (): (Certificado & { usuario: User })[] => {
+  const usuarios = new Map(todosLosUsuarios().map((u) => [u.id, u]));
+  return listarCertificados()
+    .filter((c) => usuarios.has(c.userId))
+    .map((c) => ({ ...c, usuario: usuarios.get(c.userId)! }));
+};
+
+export const getMetricas = (): MetricasAdmin => {
+  const alumnos = todosLosUsuarios().filter((u) => u.rol === 'alumno');
+  const curso = getCurso(CURSO.id);
+  const intentos = todosLosIntentos().filter((i) => alumnos.some((a) => a.id === i.userId));
+  const aprobados = intentos.filter((i) => i.aprobado).length;
+  const progresos = alumnos.map((a) => getProgreso(a.id, CURSO.id));
+  const promedio = (xs: number[]) => (xs.length ? Math.round(xs.reduce((x, y) => x + y, 0) / xs.length) : 0);
+  const meses = new Map<string, number>();
+  for (const a of alumnos) {
+    const d = new Date(a.creadoEn);
+    const k = d.toLocaleDateString('es-CL', { month: 'short', year: '2-digit' });
+    meses.set(k, (meses.get(k) ?? 0) + 1);
+  }
+  return {
+    totalAlumnos: alumnos.length,
+    alumnosActivos: alumnos.filter((a) => a.activo).length,
+    promedioAvance: promedio(progresos.map((p) => p.porcentaje)),
+    tasaAprobacion: intentos.length ? Math.round((aprobados / intentos.length) * 100) : 0,
+    certificadosEmitidos: listarCertificados().filter((c) => c.estado === 'vigente').length,
+    consultasPendientes: listarConsultas({ estado: 'pendiente' }).length,
+    avancePorModulo: curso.modulos.map((m) => ({
+      modulo: `M${m.orden}`,
+      promedio: promedio(
+        progresos.map((p) => {
+          const hechas = new Set(p.leccionesCompletadas);
+          return m.lecciones.length ? (m.lecciones.filter((l) => hechas.has(l.id)).length / m.lecciones.length) * 100 : 0;
+        }),
+      ),
+    })),
+    aprobadosVsReprobados: [
+      { nombre: 'Aprobados', valor: aprobados },
+      { nombre: 'Reprobados', valor: intentos.length - aprobados },
+    ],
+    alumnosPorMes: [...meses].map(([mes, cantidad]) => ({ mes, cantidad })),
+  };
+};
+
+export const exportarReporte = (tipo: 'notas' | 'avance' | 'asistencia'): Record<string, unknown>[] => {
+  const alumnos = todosLosUsuarios().filter((u) => u.rol === 'alumno');
+  const nombre = (u: User) => `${u.nombres} ${u.apellidos}`;
+  if (tipo === 'notas') {
+    const evs = new Map(listarEvaluaciones().map((e) => [e.id, e.nombre]));
+    return alumnos.flatMap((a) =>
+      listarIntentos(a.id).map((i) => ({
+        Alumno: nombre(a),
+        RUT: a.rut,
+        Evaluación: evs.get(i.evaluacionId) ?? i.evaluacionId,
+        Nota: i.nota.toFixed(1),
+        Estado: i.aprobado ? 'Aprobado' : 'Reprobado',
+        Fecha: new Date(i.fecha).toLocaleDateString('es-CL'),
+      })),
+    );
+  }
+  if (tipo === 'avance') {
+    return alumnos.map((a) => {
+      const p = getProgreso(a.id, CURSO.id);
+      return { Alumno: nombre(a), RUT: a.rut, 'Avance (%)': p.porcentaje, 'Horas completadas': p.horasCompletadas, 'Lecciones completadas': p.leccionesCompletadas.length };
+    });
+  }
+  const modulos = new Map(getCurso(CURSO.id).modulos.map((m) => [m.id, `M${m.orden} ${m.nombre}`]));
+  return getAsistencia().flatMap((r) => {
+    const a = alumnos.find((x) => x.id === r.userId);
+    return a ? [{ Alumno: nombre(a), RUT: a.rut, Módulo: modulos.get(r.moduloId) ?? r.moduloId, 'Asistencia (%)': r.porcentaje }] : [];
+  });
+};
+
+/** Dueño de un intento de evaluación (para que el servidor verifique permisos). */
+export const duenoIntento = (intentoId: string): string | null => leer().sesiones[intentoId]?.userId ?? null;

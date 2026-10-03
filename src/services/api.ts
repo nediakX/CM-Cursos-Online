@@ -157,21 +157,8 @@ export const crearUsuario = (data: Partial<NuevoUsuario> & { password: string })
 
 export const crearUsuariosMasivo = (
   data: (Partial<NuevoUsuario> & { password: string })[],
-): Promise<{ exitosos: User[]; errores: { rut: string; motivo: string }[] }> => {
-  if (!LOCAL_MODE) return post('/usuarios/masivo', data);
-  return L((local) => {
-  const exitosos: User[] = [];
-  const errores: { rut: string; motivo: string }[] = [];
-  for (const d of data) {
-    try {
-      exitosos.push(local.crearUsuario(d));
-    } catch (e) {
-      errores.push({ rut: d.rut ?? '', motivo: e instanceof Error && e.message === 'RUT_DUPLICADO' ? 'RUT duplicado' : 'Datos inválidos' });
-    }
-  }
-  return { exitosos, errores };
-  });
-};
+): Promise<{ exitosos: User[]; errores: { rut: string; motivo: string }[] }> =>
+  LOCAL_MODE ? L((local) => local.crearUsuariosMasivo(data)) : post('/usuarios/masivo', data);
 
 export const editarUsuario = (id: string, data: Partial<User>): Promise<User> =>
   LOCAL_MODE ? L((local) => local.editarUsuario(id, data)) : patch<User>(`/usuarios/${id}`, data);
@@ -295,16 +282,8 @@ export const calificarEntrega = (id: string, nota: number, comentario: string): 
 export const listarCertificados = (userId: string): Promise<Certificado[]> =>
   LOCAL_MODE ? L((local) => local.listarCertificados(userId)) : get<Certificado[]>('/certificados', { userId });
 
-export const listarTodosCertificados = (): Promise<(Certificado & { usuario: User })[]> => {
-  if (!LOCAL_MODE) return get('/certificados/todos');
-  return L((local) => {
-    const usuarios = new Map(local.todosLosUsuarios().map((u) => [u.id, u]));
-    return local
-      .listarCertificados()
-      .filter((c) => usuarios.has(c.userId))
-      .map((c) => ({ ...c, usuario: usuarios.get(c.userId)! }));
-  });
-};
+export const listarTodosCertificados = (): Promise<(Certificado & { usuario: User })[]> =>
+  LOCAL_MODE ? L((local) => local.listarTodosCertificados()) : get('/certificados/todos');
 
 export const puedeEmitirCertificado = (
   userId: string,
@@ -331,76 +310,11 @@ export async function verificarCertificado(codigo: string): Promise<(Certificado
 // ---------------------------------------------------------------------------
 // Métricas y reportes
 // ---------------------------------------------------------------------------
-export const getMetricas = async (): Promise<MetricasAdmin> => {
-  if (!LOCAL_MODE) return get<MetricasAdmin>('/admin/metricas');
-  const local = await cargarLocal();
-  const alumnos = local.todosLosUsuarios().filter((u) => u.rol === 'alumno');
-  const curso = local.getCurso('curso-1');
-  const intentos = local.todosLosIntentos().filter((i) => alumnos.some((a) => a.id === i.userId));
-  const aprobados = intentos.filter((i) => i.aprobado).length;
-  const progresos = alumnos.map((a) => local.getProgreso(a.id, 'curso-1'));
-  const promedio = (xs: number[]) => (xs.length ? Math.round(xs.reduce((x, y) => x + y, 0) / xs.length) : 0);
-  const meses = new Map<string, number>();
-  for (const a of alumnos) {
-    const d = new Date(a.creadoEn);
-    const k = d.toLocaleDateString('es-CL', { month: 'short', year: '2-digit' });
-    meses.set(k, (meses.get(k) ?? 0) + 1);
-  }
-  return {
-    totalAlumnos: alumnos.length,
-    alumnosActivos: alumnos.filter((a) => a.activo).length,
-    promedioAvance: promedio(progresos.map((p) => p.porcentaje)),
-    tasaAprobacion: intentos.length ? Math.round((aprobados / intentos.length) * 100) : 0,
-    certificadosEmitidos: local.listarCertificados().filter((c) => c.estado === 'vigente').length,
-    consultasPendientes: local.listarConsultas({ estado: 'pendiente' }).length,
-    avancePorModulo: curso.modulos.map((m) => ({
-      modulo: `M${m.orden}`,
-      promedio: promedio(
-        progresos.map((p) => {
-          const hechas = new Set(p.leccionesCompletadas);
-          return m.lecciones.length ? (m.lecciones.filter((l) => hechas.has(l.id)).length / m.lecciones.length) * 100 : 0;
-        }),
-      ),
-    })),
-    aprobadosVsReprobados: [
-      { nombre: 'Aprobados', valor: aprobados },
-      { nombre: 'Reprobados', valor: intentos.length - aprobados },
-    ],
-    alumnosPorMes: [...meses].map(([mes, cantidad]) => ({ mes, cantidad })),
-  };
-};
+export const getMetricas = (): Promise<MetricasAdmin> =>
+  LOCAL_MODE ? L((local) => local.getMetricas()) : get<MetricasAdmin>('/admin/metricas');
 
-export const exportarReporte = (tipo: 'notas' | 'avance' | 'asistencia'): Promise<Record<string, unknown>[]> => {
-  if (!LOCAL_MODE) return get<Record<string, unknown>[]>(`/admin/reportes/${tipo}`);
-  return L((local) => {
-    const alumnos = local.todosLosUsuarios().filter((u) => u.rol === 'alumno');
-    const nombre = (u: User) => `${u.nombres} ${u.apellidos}`;
-    if (tipo === 'notas') {
-      const evs = new Map(local.listarEvaluaciones().map((e) => [e.id, e.nombre]));
-      return alumnos.flatMap((a) =>
-        local.listarIntentos(a.id).map((i) => ({
-          Alumno: nombre(a),
-          RUT: a.rut,
-          Evaluación: evs.get(i.evaluacionId) ?? i.evaluacionId,
-          Nota: i.nota.toFixed(1),
-          Estado: i.aprobado ? 'Aprobado' : 'Reprobado',
-          Fecha: new Date(i.fecha).toLocaleDateString('es-CL'),
-        })),
-      );
-    }
-    if (tipo === 'avance') {
-      return alumnos.map((a) => {
-        const p = local.getProgreso(a.id, 'curso-1');
-        return { Alumno: nombre(a), RUT: a.rut, 'Avance (%)': p.porcentaje, 'Horas completadas': p.horasCompletadas, 'Lecciones completadas': p.leccionesCompletadas.length };
-      });
-    }
-    const modulos = new Map(local.getCurso('curso-1').modulos.map((m) => [m.id, `M${m.orden} ${m.nombre}`]));
-    return local.getAsistencia().flatMap((r) => {
-      const a = alumnos.find((x) => x.id === r.userId);
-      return a ? [{ Alumno: nombre(a), RUT: a.rut, Módulo: modulos.get(r.moduloId) ?? r.moduloId, 'Asistencia (%)': r.porcentaje }] : [];
-    });
-  });
-};
+export const exportarReporte = (tipo: 'notas' | 'avance' | 'asistencia'): Promise<Record<string, unknown>[]> =>
+  LOCAL_MODE ? L((local) => local.exportarReporte(tipo)) : get<Record<string, unknown>[]>(`/admin/reportes/${tipo}`);
 
 // ---------------------------------------------------------------------------
 // Contenido de lecciones (editor del administrador)

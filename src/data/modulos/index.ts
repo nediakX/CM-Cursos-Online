@@ -1,14 +1,14 @@
 import type { ContenidoModulo } from '../../types';
-import { M1 } from './m1';
-import { M2 } from './m2';
-import { M3 } from './m3';
-import { M4 } from './m4';
-import { M5 } from './m5';
-import { M6 } from './m6';
-import { M7 } from './m7';
-import { M8 } from './m8';
-import { M9 } from './m9';
-import { M10 } from './m10';
+import { M1 } from './m1.js';
+import { M2 } from './m2.js';
+import { M3 } from './m3.js';
+import { M4 } from './m4.js';
+import { M5 } from './m5.js';
+import { M6 } from './m6.js';
+import { M7 } from './m7.js';
+import { M8 } from './m8.js';
+import { M9 } from './m9.js';
+import { M10 } from './m10.js';
 
 /** Contenido interactivo de los 10 módulos, indexado por moduloId. */
 export const CONTENIDO_MODULOS: Record<string, ContenidoModulo> = Object.fromEntries(
