@@ -1,0 +1,119 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+@import 'tailwindcss';
+
+/*
+ * Colores de marca. Los valores por defecto se sobrescriben en tiempo de
+ * ejecución con los que el administrador define en "Sitio web → Marca"
+ * (ver src/context/SiteContext.tsx), por lo que toda la plataforma usa
+ * estos tokens en vez de colores fijos.
+ */
+@theme {
+  --color-primary: #0B2545;
+  --color-primary-hover: color-mix(in oklab, var(--color-primary) 85%, black);
+  --color-primary-light: color-mix(in oklab, var(--color-primary) 82%, white);
+  --color-accent: #F5A623;
+  --color-accent-hover: color-mix(in oklab, var(--color-accent) 90%, black);
+  /* Versión oscura del acento para texto sobre fondo claro (contraste AA). */
+  --color-accent-ink: color-mix(in oklab, var(--color-accent) 55%, black);
+  --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+  background-color: #f9fafb;
+  color: #111827;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+/* Transition defaults */
+button, a, input, select, textarea {
+  transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+}
+
+/* Focus ring: visible en fondos claros y oscuros */
+:focus-visible {
+  outline: 3px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Enlace "Saltar al contenido" (accesibilidad por teclado) */
+.skip-link {
+  position: absolute;
+  left: 1rem;
+  top: -100px;
+  z-index: 100;
+  background: var(--color-primary);
+  color: #fff;
+  padding: 0.75rem 1rem;
+  border-radius: 0.75rem;
+  font-weight: 600;
+}
+.skip-link:focus {
+  top: 1rem;
+}
+
+.sr-only-focusable:not(:focus):not(:focus-within) {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* Respeta la preferencia de movimiento reducido */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Contenido enriquecido escrito por el administrador */
+.prose-cm p { margin: 0 0 0.75rem; }
+.prose-cm p:last-child { margin-bottom: 0; }
+.prose-cm strong { font-weight: 700; }
+.prose-cm a { text-decoration: underline; text-underline-offset: 3px; }
+
+/* Print styles for certificate */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  .print-only {
+    display: block !important;
+  }
+}
+
+/* Animación sutil para contenido revelado en los módulos */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
