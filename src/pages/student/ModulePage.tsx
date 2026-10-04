@@ -43,7 +43,8 @@ const scrollArriba = () => document.querySelector('main')?.scrollTo({ top: 0, be
 export default function ModulePage() {
   const { moduloId } = useParams<{ moduloId: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { user } = useAuth();
+  const { user, refrescar } = useAuth();
+  const [bloqueadoServidor, setBloqueadoServidor] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -65,6 +66,7 @@ export default function ModulePage() {
   useEffect(() => {
     if (!user || !moduloId) return;
     setLoading(true);
+    setBloqueadoServidor(false);
     setError(false);
     getCurso('curso-1')
       .then(async (c) => {
@@ -75,7 +77,11 @@ export default function ModulePage() {
           listarEvaluaciones(mod.cursoId),
           listarIntentos(user.id),
           listarConsultas({ userId: user.id, moduloId }).catch(() => [] as Consulta[]),
-          getContenidoModulo(moduloId).catch(() => undefined),
+          getContenidoModulo(moduloId).catch((e) => {
+            // El servidor tiene la última palabra: si el módulo no está habilitado, se bloquea.
+            if (e instanceof Error && e.message === 'MODULO_NO_HABILITADO') setBloqueadoServidor(true);
+            return undefined;
+          }),
         ]);
         setContenido(cont);
         setCurso(c);
@@ -122,7 +128,10 @@ export default function ModulePage() {
   };
 
   // Bloqueo: el relator habilita cada módulo para el alumno.
-  const bloqueado = useMemo(() => !!curso && !!modulo && !modulosHabilitados(user, curso).has(modulo.id), [curso, modulo, user]);
+  const bloqueado = useMemo(
+    () => bloqueadoServidor || (!!curso && !!modulo && !modulosHabilitados(user, curso).has(modulo.id)),
+    [bloqueadoServidor, curso, modulo, user],
+  );
 
   const mejorIntento = evaluacion
     ? intentos.filter((i) => i.evaluacionId === evaluacion.id).reduce<Intento | null>((b, i) => (!b || i.nota > b.nota ? i : b), null)
@@ -139,7 +148,12 @@ export default function ModulePage() {
       }
       if (actualIdx < lecciones.length - 1) irALeccion(actualIdx + 1);
       else scrollArriba();
-    } catch {
+    } catch (e) {
+      if (e instanceof Error && e.message === 'MODULO_NO_HABILITADO') {
+        setBloqueadoServidor(true);
+        void refrescar();
+        return;
+      }
       toast('No se pudo guardar tu avance', 'error');
     } finally {
       setGuardando(false);

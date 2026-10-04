@@ -65,11 +65,18 @@ export const SITIO_POR_DEFECTO: SiteConfig = {
     { icono: 'Award', titulo: 'Certifícate', texto: 'Entrega tu proyecto final, aprueba y descarga tu certificado.' },
   ],
   instructor: {
-    nombre: 'Carlos Enrique Moll Gallardo',
-    cargo: 'Ingeniero Eléctrico · Relator principal',
-    bio: 'Ingeniero Eléctrico con experiencia como supervisor de obras eléctricas. Diseñó este programa a partir de su trabajo en terreno para ir más allá de los cursos tradicionales de preparación para la Licencia SEC: además de la normativa, aprenderás a diseñar, ejecutar y mantener instalaciones domiciliarias, industriales y fotovoltaicas.',
+    nombre: 'Carlos Moll Gallardo',
+    cargo: 'Técnico Superior en Electricidad y Electrónica · Supervisor eléctrico',
+    bio: 'Técnico Superior en Electricidad y Electrónica, en proceso de estudios de Ingeniería en Electricidad y Electrónica en la Universidad Andrés Bello. Se ha desempeñado como supervisor eléctrico en proyectos de energía renovable e industriales, entre ellos la construcción de la planta solar Azabache (EPC y O&M) y obras de remodelación en el Aeropuerto Arturo Merino Benítez, y como técnico eléctrico en minería (DISAL – Codelco). Tiene experiencia en desarrollo de proyectos eléctricos e instrumentación, y en mantenimiento preventivo, predictivo y correctivo. Diseñó este programa a partir de su trabajo en terreno.',
     fotoUrl: '',
-    credenciales: ['Instalaciones eléctricas', 'Supervisión de obras', 'Energía fotovoltaica', 'Seguridad eléctrica', 'Gestión de mantenimiento'],
+    credenciales: [
+      'Técnico Superior en Electricidad y Electrónica',
+      'Supervisión de obras eléctricas',
+      'Plantas fotovoltaicas (EPC y O&M)',
+      'Electricidad en minería',
+      'Proyectos eléctricos e instrumentación',
+      'Mantenimiento preventivo y predictivo',
+    ],
   },
   testimonios: [],
   planes: [

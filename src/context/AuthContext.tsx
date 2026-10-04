@@ -59,6 +59,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
   }, []);
 
+  // Mantiene la sesión al día (módulos habilitados, cuenta desactivada…):
+  // al volver a la pestaña y cada minuto mientras está abierta.
+  useEffect(() => {
+    if (!user) return;
+    const alVolver = () => {
+      if (document.visibilityState === 'visible') void refrescar();
+    };
+    document.addEventListener('visibilitychange', alVolver);
+    const t = window.setInterval(alVolver, 60_000);
+    return () => {
+      document.removeEventListener('visibilitychange', alVolver);
+      window.clearInterval(t);
+    };
+  }, [user?.id, refrescar]);
+
   return (
     <AuthContext.Provider value={{ user, loading, login, logout, setUser, refrescar }}>
       {children}

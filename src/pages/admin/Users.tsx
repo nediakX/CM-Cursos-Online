@@ -3,7 +3,7 @@ import Avatar from '../../components/Avatar';
 import { useNavigate } from 'react-router-dom';
 import {
   Eye, Edit, UserCheck, UserX, Key, Trash2, Plus, Upload,
-  Search, RefreshCw, Download,
+  Search, RefreshCw, Download, FileSpreadsheet, Loader2,
 } from 'lucide-react';
 import {
   listarUsuarios, crearUsuario, editarUsuario,
@@ -466,6 +466,27 @@ const Users: React.FC = () => {
   const totalPages = Math.max(1, Math.ceil(users.length / PAGE_SIZE));
   const paginated = users.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
+  const [exportando, setExportando] = useState(false);
+  const exportarExcel = async () => {
+    setExportando(true);
+    try {
+      const { exportarUsuariosExcel } = await import('../../services/exportarUsuarios');
+      const filtros = [
+        search && `búsqueda "${search}"`,
+        filterEstado !== 'todos' && (filterEstado === 'activo' ? 'activos' : 'inactivos'),
+        filterRol !== 'todos' && (filterRol === 'admin' ? 'administradores' : 'alumnos'),
+      ]
+        .filter(Boolean)
+        .join(', ');
+      await exportarUsuariosExcel(users, filtros);
+      toast('Excel generado', 'success');
+    } catch {
+      toast('No se pudo generar el Excel', 'error');
+    } finally {
+      setExportando(false);
+    }
+  };
+
   const handleSaveUser = async (data: UserFormData) => {
     setActionLoading(true);
     try {
@@ -534,6 +555,14 @@ const Users: React.FC = () => {
           <p className="text-sm text-gray-500 mt-0.5">{users.length} usuario(s) encontrado(s)</p>
         </div>
         <div className="flex gap-2">
+          <button
+            onClick={exportarExcel}
+            disabled={exportando || users.length === 0}
+            className="flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
+          >
+            {exportando ? <Loader2 size={15} className="animate-spin" /> : <FileSpreadsheet size={15} />}
+            {exportando ? 'Generando…' : 'Exportar Excel'}
+          </button>
           <button
             onClick={() => setShowBulk(true)}
             className="flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
