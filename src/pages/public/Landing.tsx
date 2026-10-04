@@ -1,4 +1,5 @@
 import React, { useEffect, useId, useRef, useState } from 'react';
+import { iniciales } from '../../utils/iniciales';
 import { Link } from 'react-router-dom';
 import {
   ArrowRight, Award, BadgeCheck, CheckCircle2, ChevronDown, Clock, Loader2, Mail, MapPin, Menu, Phone,
@@ -390,7 +391,7 @@ function Metodologia({ sec }: { sec: Sec }) {
 function Instructor({ sec }: { sec: Sec }) {
   const { sitio } = useSitio();
   const ins = sitio.instructor;
-  const iniciales = ins.nombre.split(' ').map((p) => p[0]).slice(0, 2).join('');
+  const ini = iniciales(ins.nombre);
   return (
     <section id="instructor" aria-labelledby="t-instructor" className="py-20 sm:py-24 bg-gray-50 scroll-mt-16 outline-none">
       <Contenedor className="max-w-5xl">
@@ -400,7 +401,7 @@ function Instructor({ sec }: { sec: Sec }) {
             <img src={ins.fotoUrl} alt={`Fotografía de ${ins.nombre}`} className="w-full aspect-square object-cover rounded-2xl" />
           ) : (
             <div className="w-full aspect-square rounded-2xl bg-primary flex items-center justify-center text-6xl font-extrabold text-accent" aria-hidden="true">
-              {iniciales}
+              {ini}
             </div>
           )}
           <div>
@@ -440,7 +441,7 @@ function Testimonios({ sec }: { sec: Sec }) {
                     <img src={t.fotoUrl} alt="" className="w-11 h-11 rounded-full object-cover" />
                   ) : (
                     <span className="w-11 h-11 rounded-full bg-primary/10 text-primary font-bold flex items-center justify-center" aria-hidden="true">
-                      {t.nombre.charAt(0)}
+                      {iniciales(t.nombre)}
                     </span>
                   )}
                   <span>

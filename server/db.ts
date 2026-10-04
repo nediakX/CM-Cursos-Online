@@ -118,7 +118,7 @@ const esConflicto = (e: unknown): boolean =>
 export async function conDatos<T>(fn: () => T, cuentasIniciales: () => CuentaLocal[]): Promise<T> {
   await asegurarTabla();
   for (let intento = 0; intento < 6; intento++) {
-    const filas = await db().consulta(`SELECT clave, valor, version FROM lms_datos WHERE clave <> $1`, [CLAVE_SECRETO]);
+    const filas = await db().consulta(`SELECT clave, valor, version FROM lms_datos WHERE clave <> $1 AND clave NOT LIKE '%:%'`, [CLAVE_SECRETO]);
     const estado = vacia() as unknown as Record<string, unknown>;
     const versiones = new Map<string, number>();
     for (const f of filas) {
@@ -160,4 +160,55 @@ export async function conDatos<T>(fn: () => T, cuentasIniciales: () => CuentaLoc
     }
   }
   throw new Conflicto('CONFLICTO_REINTENTA');
+}
+
+/*
+ * Datos "aparte" (fotos de los alumnos y huellas faciales): una fila por
+ * usuario con clave "foto:<id>" o "rostro:<id>". No se cargan en cada
+ * petición, sólo cuando se necesitan.
+ */
+export async function leerAparte<T>(clave: string): Promise<T | null> {
+  await asegurarTabla();
+  const [fila] = await db().consulta(`SELECT valor FROM lms_datos WHERE clave = $1`, [clave]);
+  return fila ? (fila.valor as T) : null;
+}
+export async function guardarAparte(clave: string, valor: unknown): Promise<void> {
+  await asegurarTabla();
+  await db().consulta(
+    `INSERT INTO lms_datos (clave, valor) VALUES ($1, $2::jsonb)
+     ON CONFLICT (clave) DO UPDATE SET valor = EXCLUDED.valor, version = lms_datos.version + 1, actualizado = now()`,
+    [clave, JSON.stringify(valor)],
+  );
+}
+export async function borrarAparte(clave: string): Promise<void> {
+  await asegurarTabla();
+  await db().consulta(`DELETE FROM lms_datos WHERE clave = $1`, [clave]);
+}
+
+/** Todas las filas "aparte" con un prefijo (p. ej. "ingresos:"). */
+export async function listarAparte<T>(prefijo: string): Promise<{ clave: string; valor: T }[]> {
+  await asegurarTabla();
+  const filas = await db().consulta(`SELECT clave, valor FROM lms_datos WHERE clave LIKE $1 ORDER BY clave`, [`${prefijo.replace(/[%_]/g, '\\$&')}%`]);
+  return filas.map((f) => ({ clave: f.clave as string, valor: f.valor as T }));
+}
+
+/**
+ * Agrega un elemento a una lista guardada aparte, de forma atómica (no se
+ * pierden registros con peticiones simultáneas). Conserva los últimos `max`.
+ */
+export async function agregarAparte(clave: string, elemento: unknown, max = 2000): Promise<void> {
+  await asegurarTabla();
+  await db().consulta(
+    `INSERT INTO lms_datos (clave, valor) VALUES ($1, jsonb_build_array($2::jsonb))
+     ON CONFLICT (clave) DO UPDATE SET
+       valor = (
+         SELECT COALESCE(jsonb_agg(e ORDER BY n), '[]'::jsonb) FROM (
+           SELECT e, n FROM jsonb_array_elements(lms_datos.valor || jsonb_build_array($2::jsonb)) WITH ORDINALITY AS t(e, n)
+           ORDER BY n DESC LIMIT $3
+         ) ultimos
+       ),
+       version = lms_datos.version + 1,
+       actualizado = now()`,
+    [clave, JSON.stringify(elemento), max],
+  );
 }

@@ -28,6 +28,15 @@ export default function ProtectedRoute({ roles }: ProtectedRouteProps) {
     return <Navigate to="/cambiar-password" replace />;
   }
 
+  // Alumnos: registrar o verificar el rostro antes de ver el contenido.
+  if (
+    !user.debeCambiarPassword &&
+    (user.estadoRostro === 'registrar' || user.estadoRostro === 'verificar') &&
+    location.pathname !== '/verificacion-facial'
+  ) {
+    return <Navigate to="/verificacion-facial" replace />;
+  }
+
   if (roles && !roles.includes(user.rol)) {
     const fallback = user.rol === 'admin' ? '/admin' : '/app';
     return <Navigate to={fallback} replace />;

@@ -11,6 +11,8 @@
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.2.0",
+    "@vercel/blob": "^2.8.0",
+    "@vladmandic/face-api": "^1.7.15",
     "lucide-react": "^1.49.0",
     "papaparse": "^5.7.0",
     "react": "^19.0.0",

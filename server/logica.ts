@@ -32,6 +32,8 @@ import { CURSO, EVALUACIONES } from '../src/data/curso.js';
 import { PREGUNTAS } from '../src/data/preguntas.js';
 import { CONTENIDO_MODULOS } from '../src/data/modulos/index.js';
 import { completarSitio } from '../src/data/sitio.js';
+import { estadoEvaluacion, modulosHabilitados as modulosDe, mejorIntento } from '../src/utils/evaluaciones.js';
+import { validarRut } from '../src/utils/rut.js';
 
 export interface CuentaLocal {
   user: User;
@@ -166,7 +168,7 @@ export const crearUsuario = (data: Partial<User> & { password: string }): User =
   const db = leer();
   const lista = cuentas(db);
   const rut = normalizarRut(data.rut ?? '');
-  if (!rut) throw new Error('RUT_INVALIDO');
+  if (!rut || !validarRut(rut)) throw new Error('RUT_INVALIDO');
   if (lista.some((c) => normalizarRut(c.user.rut) === rut)) throw new Error('RUT_DUPLICADO');
   const user: User = {
     id: idLocal(),
@@ -180,6 +182,9 @@ export const crearUsuario = (data: Partial<User> & { password: string }): User =
     debeCambiarPassword: data.debeCambiarPassword ?? true,
     cursosAsignados: data.cursosAsignados ?? [CURSO.id],
     creadoEn: new Date().toISOString(),
+    ...((data.rol ?? 'alumno') === 'alumno'
+      ? { modulosHabilitados: data.modulosHabilitados ?? [CURSO.modulos[0].id], requiereRostro: data.requiereRostro ?? true, rostroRegistrado: false, tieneFoto: false }
+      : {}),
   };
   lista.push({ user, password: passwords.cifrar(data.password) });
   guardar(db);
@@ -190,6 +195,7 @@ export const editarUsuario = (id: string, data: Partial<User>): User => {
   const db = leer();
   const c = cuentas(db).find((x) => x.user.id === id);
   if (!c) throw new Error('HTTP_404');
+  if (data.rut !== undefined && !validarRut(data.rut)) throw new Error('RUT_INVALIDO');
   if (data.rut && cuentas(db).some((x) => x.user.id !== id && normalizarRut(x.user.rut) === normalizarRut(data.rut!))) {
     throw new Error('RUT_DUPLICADO');
   }
@@ -354,17 +360,47 @@ export const marcarLeccion = (userId: string, leccionId: string, completada: boo
   return getProgreso(userId, CURSO.id);
 };
 
-/** ¿El alumno puede rendir esta evaluación? (módulo completo / curso completo para el examen final) */
-export const evaluacionDesbloqueada = (userId: string, ev: Evaluacion): boolean => {
-  const prog = getProgreso(userId, CURSO.id);
-  const hechas = new Set(prog.leccionesCompletadas);
+/** ¿El alumno puede rendir esta evaluación? (reglas en src/utils/evaluaciones.ts) */
+export const evaluacionDesbloqueada = (userId: string, ev: Evaluacion): boolean =>
+  estadoEvaluacion(ev, getCurso(CURSO.id), getProgreso(userId, CURSO.id), getUsuario(userId)).desbloqueada;
+
+/** ¿El usuario puede entrar a este módulo? */
+export const puedeVerModulo = (userId: string, moduloId: string): boolean => modulosDe(getUsuario(userId), getCurso(CURSO.id)).has(moduloId);
+
+/** Módulo al que pertenece una lección (o null). */
+export const moduloDeLeccion = (leccionId: string): string | null =>
+  getCurso(CURSO.id).modulos.find((m) => m.lecciones.some((l) => l.id === leccionId))?.id ?? null;
+
+/**
+ * Tabla para que el administrador habilite módulos según el avance y las
+ * evaluaciones de cada alumno.
+ */
+export const getHabilitacion = (): {
+  userId: string;
+  nombre: string;
+  rut: string;
+  activo: boolean;
+  modulosHabilitados: string[];
+  modulos: Record<string, { avance: number; nota: number | null; aprobado: boolean }>;
+}[] => {
   const curso = getCurso(CURSO.id);
-  if (ev.tipo === 'modulo' && ev.moduloId) {
-    const m = curso.modulos.find((x) => x.id === ev.moduloId);
-    return !!m && m.lecciones.every((l) => hechas.has(l.id));
-  }
-  if (ev.tipo === 'final') return prog.porcentaje === 100;
-  return true;
+  const evs = listarEvaluaciones().filter((e) => e.tipo === 'modulo' && e.moduloId);
+  return todosLosUsuarios()
+    .filter((u) => u.rol === 'alumno')
+    .map((u) => {
+      const prog = getProgreso(u.id, CURSO.id);
+      const hechas = new Set(prog.leccionesCompletadas);
+      const intentos = listarIntentos(u.id);
+      const modulos = Object.fromEntries(
+        curso.modulos.map((m) => {
+          const ev = evs.find((e) => e.moduloId === m.id);
+          const mejor = ev ? mejorIntento(intentos, ev.id) : null;
+          const avance = m.lecciones.length ? Math.round((m.lecciones.filter((l) => hechas.has(l.id)).length / m.lecciones.length) * 100) : 0;
+          return [m.id, { avance, nota: mejor?.nota ?? null, aprobado: !!mejor?.aprobado }];
+        }),
+      );
+      return { userId: u.id, nombre: `${u.nombres} ${u.apellidos}`, rut: u.rut, activo: u.activo, modulosHabilitados: [...modulosDe(u, curso)], modulos };
+    });
 };
 
 // --- Intentos ---------------------------------------------------------------
@@ -610,8 +646,8 @@ export const getFichaAlumno = (id: string): FichaAlumno => ({
 export const getContenido = (moduloId: string): ContenidoModulo => {
   const db = leer();
   const editado = db.contenidosEditados[moduloId];
-  if (editado) return editado;
   const base = CONTENIDO_MODULOS[moduloId];
+  if (editado) return { ...editado, presentacion: editado.presentacion ?? base?.presentacion ?? [] };
   if (base) return base;
   // Módulo creado desde el panel: contenido vacío a partir de sus lecciones.
   const m = getModulo(moduloId);
@@ -627,7 +663,9 @@ export const getContenido = (moduloId: string): ContenidoModulo => {
 export const guardarContenido = (moduloId: string, contenido: ContenidoModulo): ContenidoModulo => {
   if (!contenido.lecciones.length) throw new Error('MODULO_SIN_LECCIONES');
   const db = leer();
-  db.contenidosEditados[moduloId] = { ...contenido, moduloId };
+  // La presentación no se edita en el panel: siempre se usa la generada desde los manuales.
+  const { presentacion: _presentacion, ...editable } = contenido;
+  db.contenidosEditados[moduloId] = { ...editable, moduloId };
   // Mantiene sincronizadas las lecciones del módulo (avance, índice y evaluaciones).
   const lecciones = contenido.lecciones.map((l, i) => ({ id: l.leccionId, moduloId, titulo: l.titulo, orden: i + 1 }));
   const cambios = { lecciones, contenidos: lecciones.map((l) => l.titulo) };
@@ -635,7 +673,7 @@ export const guardarContenido = (moduloId: string, contenido: ContenidoModulo): 
   if (extra) Object.assign(extra, cambios);
   else db.modulosEditados[moduloId] = { ...(db.modulosEditados[moduloId] ?? {}), ...cambios };
   guardar(db);
-  return db.contenidosEditados[moduloId];
+  return getContenido(moduloId);
 };
 
 export const restaurarContenido = (moduloId: string): ContenidoModulo => {

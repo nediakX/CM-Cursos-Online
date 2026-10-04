@@ -1,5 +1,5 @@
-import React, { useId } from 'react';
-import { ArrowDown, ArrowUp, Plus, Trash2, Upload } from 'lucide-react';
+import React, { useId, useState } from 'react';
+import { ArrowDown, ArrowUp, Loader2, Plus, Trash2, Upload } from 'lucide-react';
 
 /** Controles de formulario reutilizables para los editores del administrador. */
 
@@ -99,18 +99,35 @@ export function Selector({
 
 const MAX_IMAGEN = 400 * 1024;
 
-/** Campo de imagen: pegar URL o subir un archivo pequeño (se guarda embebido). */
+/**
+ * Campo de imagen: pegar URL o subir un archivo. Con Vercel Blob configurado la
+ * imagen se sube como archivo (hasta 8 MB); si no, se guarda embebida (hasta 400 KB).
+ */
 export function CampoImagen({
   label, value, onChange, ayuda, onError,
 }: {
   label: string; value: string; onChange: (v: string) => void; ayuda?: string; onError?: (msg: string) => void;
 }) {
   const id = useId();
-  const subir = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const [subiendo, setSubiendo] = useState(false);
+  const subir = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
     if (!file.type.startsWith('image/')) return onError?.('El archivo debe ser una imagen.');
+    const { archivosDisponibles, subirArchivo } = await import('../../services/archivos');
+    if (await archivosDisponibles()) {
+      if (file.size > 8 * 1024 * 1024) return onError?.('La imagen pesa más de 8 MB. Comprímela antes de subirla.');
+      setSubiendo(true);
+      try {
+        onChange((await subirArchivo(file, 'imagen')).url);
+      } catch {
+        onError?.('No se pudo subir la imagen. Inténtalo de nuevo.');
+      } finally {
+        setSubiendo(false);
+      }
+      return;
+    }
     if (file.size > MAX_IMAGEN) return onError?.('La imagen pesa más de 400 KB. Comprímela o pega un enlace (URL) a la imagen.');
     const reader = new FileReader();
     reader.onload = () => onChange(String(reader.result));
@@ -131,8 +148,8 @@ export function CampoImagen({
           className={`${base} mt-0`}
         />
         <label className="shrink-0 inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50 cursor-pointer focus-within:ring-2 focus-within:ring-primary">
-          <Upload size={16} aria-hidden="true" /> Subir
-          <input type="file" accept="image/*" className="sr-only" onChange={subir} />
+          {subiendo ? <Loader2 size={16} className="animate-spin" aria-hidden="true" /> : <Upload size={16} aria-hidden="true" />} {subiendo ? 'Subiendo…' : 'Subir'}
+          <input type="file" accept="image/*" className="sr-only" onChange={subir} disabled={subiendo} />
         </label>
         {value && (
           <button type="button" onClick={() => onChange('')} className="shrink-0 p-2 rounded-xl text-red-700 hover:bg-red-50" aria-label={`Quitar ${label.toLowerCase()}`}>

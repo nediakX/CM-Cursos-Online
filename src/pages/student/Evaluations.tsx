@@ -91,7 +91,7 @@ export default function Evaluations() {
           <div className="space-y-3">
             {evs.map((ev) => {
               const best = getBestIntento(ev.id);
-              const estado = curso && progreso ? estadoEvaluacion(ev, curso, progreso) : { desbloqueada: true };
+              const estado = curso && progreso ? estadoEvaluacion(ev, curso, progreso, user) : { desbloqueada: false };
               return (
                 <button
                   key={ev.id}

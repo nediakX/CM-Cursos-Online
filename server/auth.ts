@@ -52,23 +52,47 @@ export function cuentasInicialesServidor(): CuentaLocal[] {
 const DURACION_SESION_MS = 7 * 24 * 60 * 60 * 1000;
 const b64url = (b: Buffer | string) => Buffer.from(b).toString('base64url');
 
-export function crearToken(userId: string, secreto: string): string {
-  const cuerpo = b64url(JSON.stringify({ sub: userId, exp: Date.now() + DURACION_SESION_MS }));
+export interface Sesion {
+  userId: string;
+  /** El alumno verificó su rostro en esta sesión. */
+  rostro: boolean;
+}
+
+export function crearToken(userId: string, secreto: string, rostro = false): string {
+  const cuerpo = b64url(JSON.stringify({ sub: userId, rf: rostro, exp: Date.now() + DURACION_SESION_MS }));
   const firma = b64url(createHmac('sha256', secreto).update(cuerpo).digest());
   return `${cuerpo}.${firma}`;
 }
 
-/** Devuelve el id del usuario si el token es válido y no ha expirado. */
-export function leerToken(token: string, secreto: string): string | null {
+/** Devuelve la sesión si el token es válido y no ha expirado. */
+export function leerToken(token: string, secreto: string): Sesion | null {
   const [cuerpo, firma] = token.split('.');
   if (!cuerpo || !firma) return null;
   const esperada = createHmac('sha256', secreto).update(cuerpo).digest();
   const recibida = Buffer.from(firma, 'base64url');
   if (recibida.length !== esperada.length || !timingSafeEqual(recibida, esperada)) return null;
   try {
-    const { sub, exp } = JSON.parse(Buffer.from(cuerpo, 'base64url').toString()) as { sub: string; exp: number };
-    return typeof sub === 'string' && exp > Date.now() ? sub : null;
+    const { sub, exp, rf } = JSON.parse(Buffer.from(cuerpo, 'base64url').toString()) as { sub: string; exp: number; rf?: boolean };
+    return typeof sub === 'string' && exp > Date.now() ? { userId: sub, rostro: rf === true } : null;
   } catch {
     return null;
   }
+}
+
+// --- Rostro -----------------------------------------------------------------
+/**
+ * Distancia euclidiana máxima entre dos descriptores faciales (face-api.js,
+ * 128 valores) para considerarlos la misma persona. 0,6 es el valor estándar;
+ * usamos 0,5 para ser más estrictos.
+ */
+export const UMBRAL_ROSTRO = 0.5;
+
+export function descriptorValido(d: unknown): d is number[] {
+  return Array.isArray(d) && d.length === 128 && d.every((x) => typeof x === 'number' && Number.isFinite(x) && Math.abs(x) < 10);
+}
+
+export function distancia(a: number[], b: number[]): number {
+  let s = 0;
+  for (let i = 0; i < a.length; i++) s += (a[i] - b[i]) ** 2;
+  return Math.sqrt(s);
 }

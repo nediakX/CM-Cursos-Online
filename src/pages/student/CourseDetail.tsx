@@ -5,26 +5,21 @@ import { useAuth } from '../../context/AuthContext';
 import { getCurso, getProgreso } from '../../services/api';
 import type { Curso, Progreso, Modulo } from '../../types';
 import ProgressBar from '../../components/ui/ProgressBar';
+import { modulosHabilitados } from '../../utils/evaluaciones';
 
 function Skeleton({ className }: { className?: string }) {
   return <div className={`animate-pulse bg-gray-200 rounded-xl ${className ?? ''}`} />;
 }
 
-type ModuleStatus = 'bloqueado' | 'en_progreso' | 'completado';
+type ModuleStatus = 'bloqueado' | 'disponible' | 'en_progreso' | 'completado';
 
-function getModuleStatus(modulo: Modulo, progreso: Progreso, index: number, modulos: Modulo[]): ModuleStatus {
+/** Un módulo está disponible sólo si el relator lo habilitó para el alumno. */
+function getModuleStatus(modulo: Modulo, progreso: Progreso, habilitados: Set<string>): ModuleStatus {
+  if (!habilitados.has(modulo.id)) return 'bloqueado';
   const completedSet = new Set(progreso.leccionesCompletadas);
   const allDone = modulo.lecciones.length > 0 && modulo.lecciones.every((l) => completedSet.has(l.id));
   if (allDone) return 'completado';
-
-  // First module is always unlocked
-  if (index === 0) return 'en_progreso';
-
-  // Check if previous module is completed
-  const prev = modulos[index - 1];
-  const prevDone = prev.lecciones.length > 0 && prev.lecciones.every((l) => completedSet.has(l.id));
-  if (!prevDone) return 'bloqueado';
-  return 'en_progreso';
+  return modulo.lecciones.some((l) => completedSet.has(l.id)) ? 'en_progreso' : 'disponible';
 }
 
 function getModuleProgress(modulo: Modulo, progreso: Progreso): number {
@@ -36,9 +31,14 @@ function getModuleProgress(modulo: Modulo, progreso: Progreso): number {
 
 const statusConfig: Record<ModuleStatus, { label: string; color: string; icon: React.ReactNode }> = {
   bloqueado: {
-    label: 'Bloqueado',
+    label: 'Bloqueado',  // lo habilita el relator
     color: 'bg-gray-100 text-gray-500',
     icon: <Lock size={14} />,
+  },
+  disponible: {
+    label: 'Disponible',
+    color: 'bg-blue-50 text-blue-700',
+    icon: <PlayCircle size={14} />,
   },
   en_progreso: {
     label: 'En progreso',
@@ -83,6 +83,8 @@ export default function CourseDetail() {
     );
   }
 
+  const habilitados = curso ? modulosHabilitados(user, curso) : new Set<string>();
+
   if (error || !curso || !progreso) {
     return (
       <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-4 max-w-3xl">
@@ -113,8 +115,9 @@ export default function CourseDetail() {
       {/* Modules list */}
       <div className="space-y-3">
         <h2 className="font-semibold text-primary text-lg">Módulos del Curso</h2>
-        {curso.modulos.map((modulo, index) => {
-          const status = getModuleStatus(modulo, progreso, index, curso.modulos);
+        <p className="text-sm text-gray-500 -mt-1">Tu relator habilita cada módulo cuando apruebas la evaluación del anterior.</p>
+        {curso.modulos.map((modulo) => {
+          const status = getModuleStatus(modulo, progreso, habilitados);
           const pct = getModuleProgress(modulo, progreso);
           const cfg = statusConfig[status];
           const isLocked = status === 'bloqueado';

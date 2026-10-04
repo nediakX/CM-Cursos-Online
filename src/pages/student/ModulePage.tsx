@@ -19,6 +19,7 @@ import {
   Trophy,
   Wrench,
   Calculator,
+  Presentation,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../components/ui/Toast';
@@ -26,10 +27,12 @@ import ProgressBar from '../../components/ui/ProgressBar';
 import { ListaBloques } from '../../components/modulo/Bloques';
 import Calculadora, { NOMBRES_CALCULADORAS } from '../../components/modulo/Calculadoras';
 import PracticaModulo from '../../components/modulo/PracticaModulo';
+import Presentacion from '../../components/modulo/Presentacion';
+import { modulosHabilitados } from '../../utils/evaluaciones';
 import { getCurso, getProgreso, marcarLeccion, listarConsultas, crearConsulta, listarEvaluaciones, listarIntentos, getContenidoModulo } from '../../services/api';
 import type { CalculadoraId, Consulta, ContenidoModulo, Curso, Evaluacion, Intento, Modulo, Progreso } from '../../types';
 
-type Tab = 'lecciones' | 'practica' | 'recursos' | 'consultas';
+type Tab = 'lecciones' | 'presentacion' | 'practica' | 'recursos' | 'consultas';
 
 function Skeleton({ className }: { className?: string }) {
   return <div className={`animate-pulse bg-gray-200 rounded-xl ${className ?? ''}`} />;
@@ -118,12 +121,8 @@ export default function ModulePage() {
     scrollArriba();
   };
 
-  // Bloqueo: el módulo anterior debe estar completo.
-  const bloqueado = useMemo(() => {
-    if (!curso || !modulo) return false;
-    const anterior = curso.modulos.find((m) => m.orden === modulo.orden - 1);
-    return !!anterior && anterior.lecciones.length > 0 && !anterior.lecciones.every((l) => completadas.has(l.id));
-  }, [curso, modulo, completadas]);
+  // Bloqueo: el relator habilita cada módulo para el alumno.
+  const bloqueado = useMemo(() => !!curso && !!modulo && !modulosHabilitados(user, curso).has(modulo.id), [curso, modulo, user]);
 
   const mejorIntento = evaluacion
     ? intentos.filter((i) => i.evaluacionId === evaluacion.id).reduce<Intento | null>((b, i) => (!b || i.nota > b.nota ? i : b), null)
@@ -192,7 +191,7 @@ export default function ModulePage() {
       <div className="max-w-xl bg-white rounded-xl shadow-sm p-8 text-center">
         <Lock size={36} className="mx-auto text-gray-300 mb-3" />
         <h1 className="font-bold text-primary text-lg">Módulo {modulo.orden} bloqueado</h1>
-        <p className="text-sm text-gray-500 mt-1">Completa todas las lecciones del módulo anterior para desbloquearlo.</p>
+        <p className="text-sm text-gray-500 mt-1">Tu relator habilitará este módulo cuando apruebes la evaluación del módulo anterior.</p>
         <button onClick={() => navigate(`/app/cursos/${modulo.cursoId}`)} className="mt-5 px-5 py-2 bg-primary text-white rounded-xl text-sm font-medium">
           Volver al curso
         </button>
@@ -207,6 +206,7 @@ export default function ModulePage() {
 
   const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
     { id: 'lecciones', label: 'Lecciones', icon: <BookOpen size={15} /> },
+    ...(contenido?.presentacion?.length ? [{ id: 'presentacion' as Tab, label: 'Presentación', icon: <Presentation size={15} /> }] : []),
     { id: 'practica', label: 'Práctica', icon: <Target size={15} /> },
     { id: 'recursos', label: 'Recursos', icon: <Wrench size={15} /> },
     { id: 'consultas', label: 'Consultas', icon: <MessageSquare size={15} /> },
@@ -257,6 +257,9 @@ export default function ModulePage() {
           </button>
         ))}
       </div>
+
+      {/* ── PRESENTACIÓN ────────────────────────────────────────────────────── */}
+      {tab === 'presentacion' && contenido?.presentacion && <Presentacion diapositivas={contenido.presentacion} modulo={`Módulo ${modulo.orden}`} />}
 
       {/* ── LECCIONES ───────────────────────────────────────────────────────── */}
       {tab === 'lecciones' && (
@@ -403,7 +406,7 @@ export default function ModulePage() {
                       <ClipboardList size={16} /> {mejorIntento ? 'Volver a rendir' : 'Rendir evaluación'}
                     </button>
                   )}
-                  {todoCompleto && siguienteModulo && (
+                  {todoCompleto && siguienteModulo && modulosHabilitados(user, curso!).has(siguienteModulo.id) && (
                     <button onClick={() => navigate(`/app/modulos/${siguienteModulo.id}`)} className="text-sm font-medium text-primary hover:underline">
                       Ir al Módulo {siguienteModulo.orden} →
                     </button>

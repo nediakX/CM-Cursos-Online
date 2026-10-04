@@ -14,6 +14,7 @@ import AdminLayout from './layouts/AdminLayout';
 import Login from './pages/auth/Login';
 const ChangePassword = lazy(() => import('./pages/auth/ChangePassword'));
 const RecoverPassword = lazy(() => import('./pages/auth/RecoverPassword'));
+const FaceVerification = lazy(() => import('./pages/auth/FaceVerification'));
 
 // Public pages
 const Landing = lazy(() => import('./pages/public/Landing'));
@@ -47,6 +48,8 @@ const Reports = lazy(() => import('./pages/admin/Reports'));
 const AdminSite = lazy(() => import('./pages/admin/AdminSite'));
 const AdminLeads = lazy(() => import('./pages/admin/AdminLeads'));
 const ContentEditor = lazy(() => import('./pages/admin/ContentEditor'));
+const AdminModules = lazy(() => import('./pages/admin/AdminModules'));
+const AdminIngresos = lazy(() => import('./pages/admin/AdminIngresos'));
 
 function Cargando() {
   return (
@@ -73,6 +76,7 @@ export default function App() {
           <Route path="/verificar-certificado/:codigo" element={<VerifyCertificate />} />
           <Route element={<ProtectedRoute />}>
             <Route path="/cambiar-password" element={<ChangePassword />} />
+            <Route path="/verificacion-facial" element={<FaceVerification />} />
           </Route>
 
           {/* Student routes */}
@@ -108,6 +112,8 @@ export default function App() {
               <Route path="/admin/certificados" element={<AdminCertificates />} />
               <Route path="/admin/reportes" element={<Reports />} />
               <Route path="/admin/sitio" element={<AdminSite />} />
+              <Route path="/admin/modulos" element={<AdminModules />} />
+              <Route path="/admin/ingresos" element={<AdminIngresos />} />
               <Route path="/admin/solicitudes" element={<AdminLeads />} />
               <Route path="/admin/contenido/:moduloId" element={<ContentEditor />} />
             </Route>

@@ -17,6 +17,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     query,
     body: req.body,
     token: auth?.startsWith('Bearer ') ? auth.slice(7) : null,
+    ip: String(req.headers['x-forwarded-for'] ?? '').split(',')[0].trim() || undefined,
   });
 
   res.setHeader('Cache-Control', 'no-store');

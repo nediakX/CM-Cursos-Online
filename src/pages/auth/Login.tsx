@@ -56,6 +56,8 @@ export default function Login() {
       const msg = err instanceof Error ? err.message : '';
       if (msg === 'CREDENCIALES_INVALIDAS') {
         setError('Credenciales incorrectas. Verifique su RUT y contraseña.');
+      } else if (msg === 'DEMASIADOS_INTENTOS') {
+        setError('Demasiados intentos fallidos. Por seguridad, espera 15 minutos antes de volver a intentarlo.');
       } else if (msg === 'USUARIO_DESACTIVADO') {
         setError('Tu cuenta está desactivada. Contacta al administrador.');
       } else {

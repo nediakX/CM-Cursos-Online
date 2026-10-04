@@ -7,6 +7,7 @@ import type { EntregaProyecto } from '../../types';
 import { useToast } from '../../components/ui/Toast';
 import { Skeleton } from '../../components/ui/Skeleton';
 import FileDropzone from '../../components/ui/FileDropzone';
+import { subirArchivo } from '../../services/archivos';
 
 const ENTREGABLES = [
   'Plano eléctrico de instalación domiciliaria',
@@ -25,6 +26,7 @@ export default function FinalProject() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [progreso, setProgreso] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -38,15 +40,37 @@ export default function FinalProject() {
     if (!user || selectedFiles.length === 0) return;
     setSubmitting(true);
     try {
-      const archivos = selectedFiles.map((f) => ({ nombre: f.name, url: '#' }));
+      // Primero se suben los archivos; la entrega se registra sólo si todos subieron bien.
+      const archivos = [];
+      for (const [i, f] of selectedFiles.entries()) {
+        setProgreso(`Subiendo ${i + 1} de ${selectedFiles.length}: ${f.name}`);
+        archivos.push(
+          await subirArchivo(f, 'entrega', {
+            userId: user.id,
+            onProgreso: (p) => setProgreso(`Subiendo ${i + 1} de ${selectedFiles.length}: ${f.name} (${p}%)`),
+          }),
+        );
+      }
+      setProgreso('Registrando la entrega…');
       const result = await entregarProyecto(user.id, archivos);
       setEntrega(result);
       setSelectedFiles([]);
       toast('Proyecto entregado exitosamente', 'success');
-    } catch {
-      toast('Error al entregar el proyecto', 'error');
+    } catch (err) {
+      const code = err instanceof Error ? err.message : '';
+      toast(
+        code === 'ARCHIVOS_NO_CONFIGURADOS'
+          ? 'La subida de archivos aún no está habilitada. Avísale a tu relator.'
+          : code === 'TIPO_NO_PERMITIDO'
+            ? 'Uno de los archivos no tiene un formato permitido (PDF, Word, Excel, imagen, DWG/DXF o ZIP).'
+            : code === 'ARCHIVO_MUY_GRANDE'
+              ? 'Uno de los archivos supera los 50 MB.'
+              : 'Error al entregar el proyecto. Revisa tu conexión e inténtalo de nuevo.',
+        'error',
+      );
     } finally {
       setSubmitting(false);
+      setProgreso(null);
     }
   };
 
@@ -134,7 +158,13 @@ export default function FinalProject() {
             {entrega.archivos.map((archivo, i) => (
               <div key={i} className="flex items-center gap-2 p-2.5 bg-gray-50 rounded-lg">
                 <FileText size={15} className="text-gray-500 shrink-0" />
-                <span className="text-sm text-gray-700">{archivo.nombre}</span>
+                {archivo.url && archivo.url !== '#' ? (
+                  <a href={archivo.url} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline">
+                    {archivo.nombre}
+                  </a>
+                ) : (
+                  <span className="text-sm text-gray-700">{archivo.nombre} <span className="text-xs text-red-700">(archivo no disponible, entregado antes de habilitar la subida)</span></span>
+                )}
               </div>
             ))}
           </div>
@@ -147,7 +177,7 @@ export default function FinalProject() {
             <FileDropzone
               onFilesSelected={(files) => setSelectedFiles(files)}
               multiple
-              accept=".pdf,.docx,.doc,.xlsx,.xls,.dwg,.png,.jpg"
+              accept=".pdf,.docx,.doc,.xlsx,.xls,.pptx,.dwg,.dxf,.png,.jpg,.jpeg,.webp,.zip"
               label="Arrastra tus archivos del proyecto aquí o haz clic para seleccionar"
               maxSizeMB={50}
             />
@@ -158,6 +188,11 @@ export default function FinalProject() {
             >
               {submitting ? 'Subiendo...' : 'Entregar Proyecto'}
             </button>
+            {progreso && (
+              <p role="status" aria-live="polite" className="text-sm text-gray-600">
+                {progreso}
+              </p>
+            )}
           </form>
         </div>
       )}

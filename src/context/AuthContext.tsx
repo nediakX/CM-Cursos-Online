@@ -8,6 +8,8 @@ interface AuthContextValue {
   login: (rut: string, password: string) => Promise<User>;
   logout: () => Promise<void>;
   setUser: (user: User | null) => void;
+  /** Vuelve a leer la sesión (p. ej. para ver módulos recién habilitados). */
+  refrescar: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -37,13 +39,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return u;
   }, []);
 
+  const refrescar = useCallback(async () => {
+    if (!getToken()) return;
+    try {
+      const nuevo = await getSesion();
+      // Sólo actualiza si algo cambió, para no recargar las páginas sin motivo.
+      setUser((actual) => (JSON.stringify(actual) === JSON.stringify(nuevo) ? actual : nuevo));
+    } catch (e) {
+      // Sesión inválida o usuario desactivado: se cierra la sesión.
+      if (e instanceof Error && (e.message === 'HTTP_401' || e.message === 'VERIFICACION_FACIAL_REQUERIDA')) {
+        await apiLogout();
+        setUser(null);
+      }
+    }
+  }, []);
+
   const logout = useCallback(async () => {
     await apiLogout();
     setUser(null);
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, setUser }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, setUser, refrescar }}>
       {children}
     </AuthContext.Provider>
   );

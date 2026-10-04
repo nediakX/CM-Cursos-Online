@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import Avatar from '../../components/Avatar';
 import { useNavigate } from 'react-router-dom';
 import {
   Eye, Edit, UserCheck, UserX, Key, Trash2, Plus, Upload,
@@ -470,7 +471,7 @@ const Users: React.FC = () => {
     try {
       if (editUser) {
         await editarUsuario(editUser.id, {
-          nombres: data.nombres, apellidos: data.apellidos,
+          nombres: data.nombres, apellidos: data.apellidos, rut: limpiarRut(data.rut),
           email: data.email, telefono: data.telefono, rol: data.rol,
           cursosAsignados: data.cursosAsignados,
         });
@@ -490,7 +491,7 @@ const Users: React.FC = () => {
       await fetchUsers();
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Error';
-      toast(msg === 'RUT_DUPLICADO' ? 'El RUT ya está registrado.' : 'Error al guardar usuario.', 'error');
+      toast(msg === 'RUT_DUPLICADO' ? 'El RUT ya está registrado en otro usuario.' : msg === 'RUT_INVALIDO' ? 'El RUT no es válido.' : 'Error al guardar usuario.', 'error');
     } finally {
       setActionLoading(false);
     }
@@ -605,7 +606,12 @@ const Users: React.FC = () => {
                 {paginated.map((u) => (
                   <tr key={u.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-4 py-3 text-sm font-mono text-gray-700">{formatearRut(u.rut)}</td>
-                    <td className="px-4 py-3 text-sm font-medium text-gray-900">{u.nombres} {u.apellidos}</td>
+                    <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                      <span className="flex items-center gap-2.5">
+                        <Avatar usuario={u} size={32} />
+                        {u.nombres} {u.apellidos}
+                      </span>
+                    </td>
                     <td className="px-4 py-3 text-sm text-gray-600">{u.email}</td>
                     <td className="px-4 py-3 text-sm text-gray-600">{u.telefono || '—'}</td>
                     <td className="px-4 py-3"><RolBadge rol={u.rol} /></td>

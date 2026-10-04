@@ -1,4 +1,5 @@
 import { Suspense, useEffect, useState } from 'react';
+import Avatar from '../components/Avatar';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   Home,
@@ -85,11 +86,14 @@ function SidebarContent({ onNavClick }: SidebarContentProps) {
 
       {/* User info + logout */}
       <div className="border-t border-white/10 p-4">
-        <div className="mb-3 px-1">
-          <p className="text-white text-sm font-semibold truncate">
-            {user?.nombres} {user?.apellidos}
-          </p>
-          <p className="text-white/70 text-xs">{formatRut(user?.rut ?? '')}</p>
+        <div className="mb-3 px-1 flex items-center gap-3">
+          {user && <Avatar usuario={user} size={40} className="ring-2 ring-white/20" tono="acento" />}
+          <div className="min-w-0">
+            <p className="text-white text-sm font-semibold truncate">
+              {user?.nombres} {user?.apellidos}
+            </p>
+            <p className="text-white/70 text-xs">{formatRut(user?.rut ?? '')}</p>
+          </div>
         </div>
         <button
           onClick={handleLogout}
@@ -108,6 +112,11 @@ export default function StudentLayout() {
   const location = useLocation();
 
   // Cierra el menú móvil al navegar y con la tecla Escape.
+  const { refrescar } = useAuth();
+  // Al navegar, relee la sesión: así aparecen los módulos que el relator habilitó.
+  useEffect(() => {
+    void refrescar();
+  }, [location.pathname, refrescar]);
   useEffect(() => setDrawerOpen(false), [location.pathname]);
   useEffect(() => {
     if (!drawerOpen) return;

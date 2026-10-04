@@ -2,6 +2,7 @@ import { defineConfig, loadEnv, type HtmlTagDescriptor, type Plugin } from 'vite
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import path from 'node:path'
+import fs from 'node:fs'
 
 import siteConfiguration from './.figma/make/site.json'
 
@@ -22,6 +23,7 @@ export default defineConfig(({ mode }) => {
     plugins: [
 react(),
       apiEnDesarrollo(),
+      modelosFaciales(),
       tailwindcss(),
       figmaSiteConfiguration(siteConfiguration),
       figmaErrorOverlayReplay(),
@@ -400,6 +402,39 @@ function apiEnDesarrollo(): Plugin {
           res.end(JSON.stringify({ code: 'ERROR_INTERNO' }))
         }
       })
+    },
+  }
+}
+
+/**
+ * Modelos de reconocimiento facial (face-api.js) servidos desde el propio
+ * sitio en /models/: se copian desde node_modules al compilar y se sirven
+ * directamente en `pnpm dev`.
+ */
+function modelosFaciales(): Plugin {
+  const dir = path.resolve(__dirname, 'node_modules/@vladmandic/face-api/model')
+  const archivos = [
+    'tiny_face_detector_model-weights_manifest.json',
+    'tiny_face_detector_model.bin',
+    'face_landmark_68_model-weights_manifest.json',
+    'face_landmark_68_model.bin',
+    'face_recognition_model-weights_manifest.json',
+    'face_recognition_model.bin',
+  ]
+  return {
+    name: 'cm-modelos-faciales',
+    configureServer(server) {
+      server.middlewares.use('/models', (req, res, next) => {
+        const nombre = (req.url ?? '').split('?')[0].replace(/^\//, '')
+        if (!archivos.includes(nombre)) return next()
+        res.setHeader('Content-Type', nombre.endsWith('.json') ? 'application/json' : 'application/octet-stream')
+        fs.createReadStream(path.join(dir, nombre)).pipe(res)
+      })
+    },
+    generateBundle() {
+      for (const nombre of archivos) {
+        this.emitFile({ type: 'asset', fileName: `models/${nombre}`, source: fs.readFileSync(path.join(dir, nombre)) })
+      }
     },
   }
 }

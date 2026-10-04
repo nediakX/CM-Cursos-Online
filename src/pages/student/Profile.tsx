@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import Avatar from '../../components/Avatar';
 import { User, Mail, Phone, Lock, Save } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { editarUsuario, cambiarPassword } from '../../services/api';
@@ -75,11 +76,7 @@ export default function Profile() {
 
       {/* User avatar / info summary */}
       <div className="bg-primary rounded-xl p-5 flex items-center gap-4 text-white">
-        <div className="w-14 h-14 rounded-full bg-accent flex items-center justify-center shrink-0">
-          <span className="text-primary font-black text-xl">
-            {user.nombres.charAt(0)}{user.apellidos.charAt(0)}
-          </span>
-        </div>
+        <Avatar usuario={user} size={64} className="ring-2 ring-white/30" tono="acento" />
         <div>
           <p className="font-bold text-lg">
             {user.nombres} {user.apellidos}
@@ -88,6 +85,7 @@ export default function Profile() {
           <span className="text-xs bg-accent text-primary px-2 py-0.5 rounded-full font-semibold capitalize">
             {user.rol}
           </span>
+          {user.tieneFoto && <p className="text-white/70 text-xs mt-1.5">Tu fotografía se registró con tu rostro. Para cambiarla, pídelo a tu relator.</p>}
         </div>
       </div>
 

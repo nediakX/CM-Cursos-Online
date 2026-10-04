@@ -1,7 +1,8 @@
 import React, { Suspense, useEffect, useState } from 'react';
+import Avatar from '../components/Avatar';
 import { NavLink, useNavigate, Outlet, useLocation } from 'react-router-dom';
 import {
-  LayoutDashboard, Users, BookOpen, HelpCircle, MessageSquare, FolderOpen, Calendar, Award, BarChart3,
+  LayoutDashboard, Users, LockOpen, LogIn, BookOpen, HelpCircle, MessageSquare, FolderOpen, Calendar, Award, BarChart3,
   LogOut, Menu, X, Globe, Inbox, ExternalLink, Loader2,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -36,6 +37,8 @@ const GRUPOS: { titulo: string; items: NavItem[] }[] = [
     items: [
       { to: '/admin/consultas', icon: <MessageSquare size={18} />, label: 'Consultas' },
       { to: '/admin/proyectos', icon: <FolderOpen size={18} />, label: 'Proyectos' },
+      { to: '/admin/modulos', icon: <LockOpen size={18} />, label: 'Habilitar módulos' },
+      { to: '/admin/ingresos', icon: <LogIn size={18} />, label: 'Registro de ingresos' },
       { to: '/admin/asistencia', icon: <Calendar size={18} />, label: 'Asistencia' },
       { to: '/admin/certificados', icon: <Award size={18} />, label: 'Certificados' },
       { to: '/admin/reportes', icon: <BarChart3 size={18} />, label: 'Reportes' },
@@ -98,9 +101,12 @@ const SidebarContent: React.FC<{ onNavClick?: () => void; nuevas: number }> = ({
       </nav>
 
       <div className="px-3 py-4 border-t border-white/10">
-        <div className="px-3 py-2 mb-1">
-          <p className="text-white text-sm font-medium truncate">{user ? `${user.nombres} ${user.apellidos}` : 'Administrador'}</p>
-          <p className="text-white/70 text-xs truncate">{user?.email}</p>
+        <div className="px-3 py-2 mb-1 flex items-center gap-3">
+          {user && <Avatar usuario={user} size={36} className="ring-2 ring-white/20" tono="acento" />}
+          <div className="min-w-0">
+            <p className="text-white text-sm font-medium truncate">{user ? `${user.nombres} ${user.apellidos}` : 'Administrador'}</p>
+            <p className="text-white/70 text-xs truncate">{user?.email}</p>
+          </div>
         </div>
         <button
           onClick={handleLogout}

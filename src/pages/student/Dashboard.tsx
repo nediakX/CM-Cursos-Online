@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { modulosHabilitados } from '../../utils/evaluaciones';
 import { useNavigate } from 'react-router-dom';
 import { CheckCircle, XCircle, ArrowRight, Calendar } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
@@ -58,8 +59,10 @@ export default function Dashboard() {
         setAsistencia(asist);
         // Find first incomplete module
         const completedSet = new Set(prog.leccionesCompletadas);
+        // Primer módulo habilitado por el relator que aún no termina.
+        const habilitados = modulosHabilitados(user, curso);
         const incomplete = curso.modulos.find(
-          (m) => !m.lecciones.every((l) => completedSet.has(l.id)),
+          (m) => habilitados.has(m.id) && !m.lecciones.every((l) => completedSet.has(l.id)),
         );
         setNextModule(incomplete ?? null);
       })

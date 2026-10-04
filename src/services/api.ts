@@ -36,7 +36,7 @@ import { completarSitio } from '../data/sitio';
 // ---------------------------------------------------------------------------
 // Núcleo HTTP
 // ---------------------------------------------------------------------------
-const BASE_URL: string = import.meta.env.VITE_API_URL ?? '/api';
+export const BASE_URL: string = import.meta.env.VITE_API_URL ?? '/api';
 const TOKEN_KEY = 'lms_token';
 
 export const getToken = (): string | null => localStorage.getItem(TOKEN_KEY);
@@ -326,3 +326,81 @@ export const eliminarSolicitud = (id: string): Promise<void> => (del<void>(`/sol
 /** Temario público para la landing (sin autenticación). Backend: GET /publico/curso */
 export const getCursoPublico = (): Promise<Curso> =>
   get<Curso>('/publico/curso');
+
+// ---------------------------------------------------------------------------
+// Habilitación de módulos (administrador)
+// ---------------------------------------------------------------------------
+export interface FilaHabilitacion {
+  userId: string;
+  nombre: string;
+  rut: string;
+  activo: boolean;
+  modulosHabilitados: string[];
+  modulos: Record<string, { avance: number; nota: number | null; aprobado: boolean }>;
+}
+export const getHabilitacion = (): Promise<FilaHabilitacion[]> => get<FilaHabilitacion[]>('/admin/habilitacion');
+export const habilitarModulos = (userId: string, modulosHabilitados: string[]): Promise<User> =>
+  patch<User>(`/usuarios/${userId}`, { modulosHabilitados });
+
+// ---------------------------------------------------------------------------
+// Fotografías y verificación facial
+//   El navegador calcula el descriptor facial; el servidor lo guarda o lo compara.
+// ---------------------------------------------------------------------------
+const fotosCache = new Map<string, Promise<string | null>>();
+/** Foto del usuario (data URL) o null. Se guarda en memoria para no pedirla de nuevo. */
+export const getFoto = (userId: string): Promise<string | null> => {
+  if (!fotosCache.has(userId)) {
+    const p = get<{ foto: string | null }>(`/fotos/${userId}`)
+      .then((r) => r.foto)
+      .catch(() => {
+        fotosCache.delete(userId);
+        return null;
+      });
+    fotosCache.set(userId, p);
+  }
+  return fotosCache.get(userId)!;
+};
+const olvidarFoto = (userId: string) => fotosCache.delete(userId);
+
+export const subirFoto = async (userId: string, foto: string): Promise<User> => {
+  olvidarFoto(userId);
+  return put<User>(`/fotos/${userId}`, { foto });
+};
+export const borrarFoto = async (userId: string): Promise<User> => {
+  olvidarFoto(userId);
+  return del<User>(`/fotos/${userId}`);
+};
+
+/** El alumno registra su rostro (primera vez). Devuelve la sesión ya verificada. */
+export async function registrarMiRostro(descriptor: number[], foto: string): Promise<User> {
+  const r = await post<{ token: string; user: User }>('/rostro/registro', { descriptor, foto });
+  setToken(r.token);
+  olvidarFoto(r.user.id);
+  return r.user;
+}
+/** El alumno verifica su rostro al iniciar sesión. */
+export async function verificarMiRostro(descriptor: number[]): Promise<User> {
+  const r = await post<{ token: string; user: User }>('/rostro/verificar', { descriptor });
+  setToken(r.token);
+  return r.user;
+}
+/** El administrador registra el rostro de un alumno desde una foto. */
+export const registrarRostroAlumno = (userId: string, descriptor: number[], foto: string): Promise<User> => {
+  olvidarFoto(userId);
+  return post<User>(`/rostro/${userId}`, { descriptor, foto });
+};
+/** El administrador borra el rostro registrado (el alumno lo registra de nuevo al entrar). */
+export const borrarRostroAlumno = (userId: string): Promise<User> => del<User>(`/rostro/${userId}`);
+
+// ---------------------------------------------------------------------------
+// Registro de ingresos (asistencia automática)
+// ---------------------------------------------------------------------------
+export interface Ingreso {
+  fecha: string;
+  metodo: 'rostro' | 'contrasena';
+  ip?: string;
+}
+/** Administrador: ingresos de todos los alumnos. */
+export const listarIngresos = (): Promise<{ userId: string; ingresos: Ingreso[] }[]> => get('/ingresos');
+/** Ingresos de un alumno (el administrador, de cualquiera; el alumno, los suyos). */
+export const getIngresos = (userId?: string): Promise<Ingreso[]> => get('/ingresos', { userId });

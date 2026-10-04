@@ -12,7 +12,19 @@ export interface User {
   debeCambiarPassword: boolean;
   cursosAsignados: string[];
   creadoEn: string;
+  /** Módulos que el administrador habilitó para el alumno (por defecto sólo el primero). */
+  modulosHabilitados?: string[];
+  /** El usuario tiene fotografía cargada (se obtiene con getFoto). */
+  tieneFoto?: boolean;
+  /** Si el alumno debe verificar su rostro al iniciar sesión (por defecto sí). */
+  requiereRostro?: boolean;
+  /** El alumno ya registró su rostro. */
+  rostroRegistrado?: boolean;
+  /** Sólo en la sesión actual (login y /auth/me): qué falta respecto del rostro. */
+  estadoRostro?: EstadoRostro;
 }
+
+export type EstadoRostro = 'no_requerido' | 'registrar' | 'verificar' | 'verificado';
 
 export interface Material {
   id: string;
@@ -96,8 +108,25 @@ export interface LeccionContenido {
   bloques: BloqueContenido[];
 }
 
+/** Presentación (diapositivas) de un módulo. */
+export interface ItemDiapositiva {
+  tipo: 'texto' | 'punto' | 'dato' | 'encabezado' | 'formula';
+  texto: string;
+}
+export interface BloqueDiapositiva {
+  subtitulo?: string;
+  items: ItemDiapositiva[];
+}
+export interface Diapositiva {
+  tipo: 'portada' | 'contenido' | 'resumen';
+  etiqueta?: string;
+  titulo: string;
+  bloques: BloqueDiapositiva[];
+}
+
 export interface ContenidoModulo {
   moduloId: string;
+  presentacion?: Diapositiva[];
   introduccion: string;
   lecciones: LeccionContenido[];
   resumen: string[];

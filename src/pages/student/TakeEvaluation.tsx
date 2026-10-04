@@ -57,7 +57,7 @@ export default function TakeEvaluation() {
         const ev = evals.find((e) => e.id === evaluacionId);
         if (!ev) throw new Error('not found');
         setEvaluacion(ev);
-        const estado = estadoEvaluacion(ev, curso, prog);
+        const estado = estadoEvaluacion(ev, curso, prog, user);
         setBloqueo(estado.desbloqueada ? null : estado.motivo ?? 'Evaluación bloqueada');
       })
       .catch(() => setError('Evaluación no encontrada.'))

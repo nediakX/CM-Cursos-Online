@@ -6,8 +6,11 @@ import type { FichaAlumno, Curso } from '../../types';
 import { useToast } from '../../components/ui/Toast';
 import { formatearRut } from '../../utils/rut';
 import Badge from '../../components/ui/Badge';
+import Avatar from '../../components/Avatar';
+import { IdentidadPanel, ModulosAlumnoPanel } from '../../components/admin/PanelesAlumno';
+import type { User } from '../../types';
 
-const TABS = ['Progreso', 'Evaluaciones', 'Asistencia', 'Proyecto', 'Certificados'] as const;
+const TABS = ['Módulos', 'Identidad', 'Progreso', 'Evaluaciones', 'Asistencia', 'Proyecto', 'Certificados'] as const;
 type Tab = typeof TABS[number];
 
 const UserProfile: React.FC = () => {
@@ -17,7 +20,7 @@ const UserProfile: React.FC = () => {
   const [ficha, setFicha] = useState<FichaAlumno | null>(null);
   const [curso, setCurso] = useState<Curso | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<Tab>('Progreso');
+  const [activeTab, setActiveTab] = useState<Tab>('Módulos');
 
   useEffect(() => {
     if (!id) return;
@@ -41,6 +44,7 @@ const UserProfile: React.FC = () => {
   }
 
   const { usuario, progreso, intentos, asistencia, entregas, certificados } = ficha;
+  const actualizarUsuario = (u: User) => setFicha((f) => (f ? { ...f, usuario: u } : f));
 
   const moduloNombre = (moduloId: string) => curso?.modulos.find((m) => m.id === moduloId)?.nombre ?? moduloId;
 
@@ -53,9 +57,7 @@ const UserProfile: React.FC = () => {
 
       {/* Header */}
       <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 flex items-start gap-5">
-        <div className="w-16 h-16 rounded-2xl bg-primary flex items-center justify-center text-white text-2xl font-bold shrink-0">
-          {usuario.nombres[0]}{usuario.apellidos[0]}
-        </div>
+        <Avatar usuario={usuario} size={72} forma="cuadrado" />
         <div className="flex-1 min-w-0">
           <h1 className="text-xl font-bold text-gray-800">{usuario.nombres} {usuario.apellidos}</h1>
           <p className="text-gray-500 text-sm mt-0.5">{formatearRut(usuario.rut)} · {usuario.email}</p>
@@ -72,7 +74,7 @@ const UserProfile: React.FC = () => {
 
       {/* Tabs */}
       <div className="border-b border-gray-200">
-        <div className="flex gap-0">
+        <div className="flex gap-0 overflow-x-auto">
           {TABS.map((t) => (
             <button
               key={t}
@@ -91,6 +93,8 @@ const UserProfile: React.FC = () => {
 
       {/* Tab content */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        {activeTab === 'Módulos' && curso && <ModulosAlumnoPanel usuario={usuario} curso={curso} onCambio={actualizarUsuario} />}
+        {activeTab === 'Identidad' && <IdentidadPanel usuario={usuario} onCambio={actualizarUsuario} />}
         {/* Progreso */}
         {activeTab === 'Progreso' && (
           <div className="p-5">

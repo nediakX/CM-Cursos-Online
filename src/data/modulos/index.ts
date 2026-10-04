@@ -9,10 +9,11 @@ import { M7 } from './m7.js';
 import { M8 } from './m8.js';
 import { M9 } from './m9.js';
 import { M10 } from './m10.js';
+import { PRESENTACIONES } from '../presentaciones.js';
 
 /** Contenido interactivo de los 10 módulos, indexado por moduloId. */
 export const CONTENIDO_MODULOS: Record<string, ContenidoModulo> = Object.fromEntries(
-  [M1, M2, M3, M4, M5, M6, M7, M8, M9, M10].map((m) => [m.moduloId, m]),
+  [M1, M2, M3, M4, M5, M6, M7, M8, M9, M10].map((m) => [m.moduloId, { ...m, presentacion: PRESENTACIONES[m.moduloId] ?? [] }]),
 );
 
 export const getContenidoModulo = (moduloId: string): ContenidoModulo | undefined => CONTENIDO_MODULOS[moduloId];
