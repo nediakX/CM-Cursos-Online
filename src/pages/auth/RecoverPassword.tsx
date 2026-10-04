@@ -1,113 +1,77 @@
-import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, Loader2, Mail } from 'lucide-react';
-import { formatearRut, validarRut, limpiarRut } from '../../utils/rut';
-import { recuperarPassword } from '../../services/api';
+import { ArrowLeft, KeyRound, Mail, Phone } from 'lucide-react';
+import { useSitio } from '../../context/SiteContext';
+import { enlaceWhatsapp, IconoWhatsapp } from '../../components/landing/RedesIconos';
 
+/**
+ * La plataforma no envía correos: la contraseña la restablece el relator desde
+ * el panel (Usuarios → Restablecer contraseña). Esta página explica cómo
+ * pedírselo, con los datos de contacto configurados en el sitio.
+ */
 export default function RecoverPassword() {
-  const [rut, setRut] = useState('');
-  const [rutError, setRutError] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [sent, setSent] = useState(false);
-
-  const handleRutChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const clean = limpiarRut(e.target.value);
-    setRut(clean.length > 0 ? formatearRut(clean) : '');
-    setRutError('');
-  };
-
-  const handleRutBlur = () => {
-    if (rut && !validarRut(rut)) {
-      setRutError('RUT inválido. Verifique el dígito verificador.');
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!validarRut(rut)) {
-      setRutError('RUT inválido. Verifique el dígito verificador.');
-      return;
-    }
-    setLoading(true);
-    try {
-      await recuperarPassword(limpiarRut(rut));
-      setSent(true);
-    } catch {
-      // Still show success message to avoid RUT enumeration
-      setSent(true);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { sitio } = useSitio();
+  const c = sitio.contacto;
+  const hayContacto = !!(c.whatsapp || c.email || c.telefono);
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
       <div className="w-full max-w-md bg-white rounded-2xl shadow-lg p-8">
-        {/* Header */}
-        <div className="flex flex-col items-center mb-8">
+        <div className="flex flex-col items-center mb-6">
           <div className="w-14 h-14 rounded-full bg-primary flex items-center justify-center mb-4">
-            <Mail size={28} className="text-white" />
+            <KeyRound size={28} className="text-white" aria-hidden="true" />
           </div>
-          <h1 className="text-xl font-bold text-primary">Recuperar contraseña</h1>
-          <p className="text-sm text-gray-500 text-center mt-1">
-            Ingresa tu RUT y te enviaremos instrucciones a tu correo registrado.
+          <h1 className="text-xl font-bold text-primary">¿Olvidaste tu contraseña?</h1>
+          <p className="text-sm text-gray-600 text-center mt-2">
+            Pídele a tu relator que la restablezca. Te entregará una contraseña temporal y, al ingresar, la plataforma te pedirá crear una nueva.
           </p>
         </div>
 
-        {sent ? (
-          <div className="space-y-5">
-            <div className="rounded-xl bg-green-50 border border-green-200 px-5 py-4 text-sm text-green-700">
-              Si el RUT está registrado, recibirás un correo con instrucciones para recuperar tu
-              contraseña.
-            </div>
-            <Link
-              to="/login"
-              className="flex items-center justify-center gap-2 text-sm text-primary hover:text-accent transition-colors font-medium"
-            >
-              <ArrowLeft size={16} />
-              Volver al inicio de sesión
-            </Link>
-          </div>
+        {hayContacto ? (
+          <ul className="space-y-2">
+            {c.whatsapp && (
+              <li>
+                <a
+                  href={enlaceWhatsapp(c.whatsapp, 'Hola, olvidé mi contraseña de la plataforma del curso. Mi RUT es: ')}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3 text-sm font-medium text-gray-800 hover:bg-gray-50"
+                >
+                  <span className="text-[#187a41]"><IconoWhatsapp size={20} /></span> Escribir por WhatsApp
+                </a>
+              </li>
+            )}
+            {c.email && (
+              <li>
+                <a
+                  href={`mailto:${c.email}?subject=${encodeURIComponent('Restablecer contraseña')}`}
+                  className="flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3 text-sm font-medium text-gray-800 hover:bg-gray-50"
+                >
+                  <Mail size={20} className="text-primary" aria-hidden="true" /> {c.email}
+                </a>
+              </li>
+            )}
+            {c.telefono && (
+              <li>
+                <a
+                  href={`tel:${c.telefono.replace(/\s/g, '')}`}
+                  className="flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3 text-sm font-medium text-gray-800 hover:bg-gray-50"
+                >
+                  <Phone size={20} className="text-primary" aria-hidden="true" /> {c.telefono}
+                </a>
+              </li>
+            )}
+          </ul>
         ) : (
-          <form onSubmit={handleSubmit} className="space-y-5" noValidate>
-            <div className="flex flex-col gap-1">
-              <label htmlFor="rut-recover" className="text-sm font-medium text-gray-700">
-                RUT
-              </label>
-              <input
-                id="rut-recover"
-                type="text"
-                placeholder="12.345.678-9"
-                value={rut}
-                onChange={handleRutChange}
-                onBlur={handleRutBlur}
-                className={[
-                  'w-full rounded-xl border bg-white px-3 py-2.5 text-sm text-gray-900 placeholder-gray-400',
-                  'transition-all duration-150 outline-none focus:ring-2 focus:ring-primary focus:border-primary',
-                  rutError ? 'border-red-400 focus:ring-red-400 focus:border-red-400' : 'border-gray-300',
-                ].join(' ')}
-              />
-              {rutError && <p className="text-xs text-red-700">{rutError}</p>}
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading || !rut}
-              className="w-full flex items-center justify-center gap-2 rounded-xl bg-primary text-white font-semibold py-2.5 px-4 hover:bg-primary-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loading && <Loader2 size={16} className="animate-spin" />}
-              {loading ? 'Enviando…' : 'Recuperar contraseña'}
-            </button>
-
-            <Link
-              to="/login"
-              className="flex items-center justify-center gap-2 text-sm text-gray-500 hover:text-primary transition-colors"
-            >
-              <ArrowLeft size={16} />
-              Volver al inicio de sesión
-            </Link>
-          </form>
+          <p className="rounded-xl bg-gray-50 px-4 py-3 text-sm text-gray-700">Contacta a tu relator por el medio que usas habitualmente con él.</p>
         )}
+
+        <Link
+          to="/login"
+          className="mt-6 flex items-center justify-center gap-2 text-sm text-primary hover:text-accent transition-colors font-medium"
+        >
+          <ArrowLeft size={16} aria-hidden="true" />
+          Volver al inicio de sesión
+        </Link>
       </div>
     </div>
   );

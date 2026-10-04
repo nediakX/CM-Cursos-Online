@@ -120,9 +120,9 @@ export default function Login() {
 
           <ul className="space-y-5">
             {[
-              { icon: <GraduationCap size={20} />, text: 'Clases online cuando quieras' },
+              { icon: <GraduationCap size={20} />, text: 'Contenido disponible las 24 horas' },
               { icon: <Zap size={20} />, text: 'Simuladores de examen SEC' },
-              { icon: <Sun size={20} />, text: 'Certificación reconocida' },
+              { icon: <Sun size={20} />, text: 'Certificado con código verificable' },
             ].map(({ icon, text }) => (
               <li key={text} className="flex items-center gap-3 text-white/90">
                 <span className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center text-accent shrink-0">

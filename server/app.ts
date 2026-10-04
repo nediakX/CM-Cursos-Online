@@ -192,8 +192,6 @@ ruta(
   },
   { sinRostro: true },
 );
-// Sin servicio de correo: el administrador restablece la contraseña desde el panel.
-ruta('POST', '/auth/recuperar-password', 'publico', () => undefined);
 
 // --- Usuarios ---------------------------------------------------------------
 ruta('GET', '/usuarios', 'admin', (c) =>

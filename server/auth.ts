@@ -37,7 +37,7 @@ export function cuentasInicialesServidor(): CuentaLocal[] {
         rut: normalizarRut(process.env.ADMIN_RUT ?? '11.111.111-1'),
         nombres: 'Carlos',
         apellidos: 'Moll',
-        email: 'carlos.moll@cmingenierias.cl',
+        email: process.env.ADMIN_EMAIL ?? '',
         telefono: '',
         rol: 'admin',
         activo: true,

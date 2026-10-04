@@ -114,9 +114,6 @@ export const getSesion = (): Promise<User> => (get<User>('/auth/me'));
 export const cambiarPassword = (actual: string, nueva: string): Promise<void> =>
   post<void>('/auth/cambiar-password', { actual, nueva });
 
-export const recuperarPassword = (rut: string): Promise<void> =>
-  post<void>('/auth/recuperar-password', { rut });
-
 // ---------------------------------------------------------------------------
 // Usuarios
 // ---------------------------------------------------------------------------

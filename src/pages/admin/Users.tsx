@@ -267,7 +267,8 @@ const BulkModal: React.FC<{ isOpen: boolean; onClose: () => void; onSuccess: () 
   const [loading, setLoading] = useState(false);
 
   const handleTemplate = () => {
-    downloadCSV([{ nombres: 'Juan', apellidos: 'Pérez', rut: '12.345.678-9', email: 'juan@ejemplo.cl', telefono: '+56912345678', rol: 'alumno' }], 'plantilla_usuarios.csv');
+    // Plantilla sólo con encabezados: se completa con los datos reales de los alumnos.
+    downloadCSV([{ nombres: '', apellidos: '', rut: '', email: '', telefono: '', rol: 'alumno' }], 'plantilla_usuarios.csv');
   };
 
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {

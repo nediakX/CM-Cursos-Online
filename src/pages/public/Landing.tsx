@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import {
   ArrowRight, Award, BadgeCheck, CheckCircle2, ChevronDown, Clock, Loader2, Mail, MapPin, Menu, Phone,
   PlayCircle, Quote, ShieldCheck, Sparkles, X,
+  BookOpen,
 } from 'lucide-react';
 import { useSitio } from '../../context/SiteContext';
 import { useAuth } from '../../context/AuthContext';
@@ -157,43 +158,35 @@ function Cabecera({ visibles }: { visibles: Set<SeccionLandingId> }) {
 }
 
 // ─── Hero ─────────────────────────────────────────────────────────────────────
+/** Vista del temario real del curso (cuando no hay imagen de portada). */
 function MaquetaCurso({ curso }: { curso: Curso | null }) {
-  const modulos = (curso?.modulos ?? []).slice(0, 4);
+  const modulos = (curso?.modulos ?? []).slice(0, 5);
+  if (!curso) return null;
   return (
-    <div className="relative" aria-hidden="true">
-      <div className="absolute -inset-6 bg-accent/20 blur-3xl rounded-full" />
+    <div className="relative">
+      <div className="absolute -inset-6 bg-accent/20 blur-3xl rounded-full" aria-hidden="true" />
       <div className="relative bg-white rounded-2xl shadow-2xl p-5 sm:p-6">
         <div className="flex items-center gap-3 mb-5">
           <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center">
-            <PlayCircle size={20} className="text-accent" />
+            <BookOpen size={20} className="text-accent" aria-hidden="true" />
           </div>
           <div className="min-w-0">
-            <p className="text-xs text-gray-500">Tu avance</p>
-            <p className="font-bold text-primary truncate">{curso?.nombre ?? 'Instalador Eléctrico Clase D'}</p>
+            <p className="text-xs text-gray-500">Temario · {curso.horasTotales} horas</p>
+            <p className="font-bold text-primary truncate">{curso.nombre}</p>
           </div>
         </div>
-        <ul className="space-y-3">
-          {(modulos.length ? modulos : Array.from({ length: 4 }, (_, i) => ({ id: String(i), orden: i + 1, nombre: 'Módulo' }))).map((m, i) => (
+        <ol className="space-y-2.5">
+          {modulos.map((m) => (
             <li key={m.id} className="flex items-center gap-3">
-              <span className={`w-7 h-7 rounded-full text-xs font-bold flex items-center justify-center shrink-0 ${i < 2 ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>
-                {i < 2 ? <CheckCircle2 size={16} /> : m.orden}
-              </span>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-800 truncate">{m.nombre}</p>
-                <div className="h-1.5 bg-gray-100 rounded-full mt-1.5 overflow-hidden">
-                  <div className="h-full bg-accent rounded-full" style={{ width: `${[100, 100, 60, 15][i]}%` }} />
-                </div>
-              </div>
+              <span className="w-7 h-7 rounded-full bg-primary/5 text-primary text-xs font-bold flex items-center justify-center shrink-0">{m.orden}</span>
+              <span className="flex-1 min-w-0 text-sm font-medium text-gray-800 truncate">{m.nombre}</span>
+              <span className="text-xs text-gray-500 shrink-0">{m.horas} h</span>
             </li>
           ))}
-        </ul>
-      </div>
-      <div className="absolute -bottom-6 -left-4 sm:-left-8 bg-white rounded-xl shadow-xl px-4 py-3 flex items-center gap-3 -rotate-2">
-        <Award size={22} className="text-accent-ink" />
-        <div>
-          <p className="text-xs text-gray-500">Certificado</p>
-          <p className="text-sm font-bold text-primary">Verificable en línea</p>
-        </div>
+        </ol>
+        {curso.modulos.length > modulos.length && (
+          <p className="mt-3 text-xs text-gray-500">y {curso.modulos.length - modulos.length} módulos más</p>
+        )}
       </div>
     </div>
   );
