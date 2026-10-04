@@ -10,7 +10,7 @@
  * que nunca se pierden datos por escrituras simultáneas.
  */
 import { neon } from '@neondatabase/serverless';
-import { configurarAlmacen, vacia, type Almacen, type CuentaLocal, type Db } from '../src/services/localStore.js';
+import { configurarAlmacen, vacia, type Almacen, type CuentaLocal, type Db } from './logica.js';
 
 export interface Conexion {
   consulta(texto: string, params?: unknown[]): Promise<Record<string, unknown>[]>;

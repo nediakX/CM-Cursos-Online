@@ -3,7 +3,7 @@
  * reutilizando la lógica de src/services/localStore.ts, con autenticación y
  * permisos por rol.
  */
-import * as L from '../src/services/localStore.js';
+import * as L from './logica.js';
 import type { User } from '../src/types';
 import { cifrarPassword, crearToken, cuentasInicialesServidor, leerToken, passwordTemporal, verificarPassword } from './auth.js';
 import { conDatos, obtenerSecreto } from './db.js';

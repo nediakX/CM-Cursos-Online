@@ -1,4 +1,4 @@
-import { defineConfig, type HtmlTagDescriptor, type Plugin } from 'vite'
+import { defineConfig, loadEnv, type HtmlTagDescriptor, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import path from 'node:path'
@@ -8,6 +8,8 @@ import siteConfiguration from './.figma/make/site.json'
 
 // Vite config — https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
+  // Variables del servidor (DATABASE_URL, ADMIN_PASSWORD…) para la API en `pnpm dev`.
+  for (const [k, v] of Object.entries(loadEnv(mode, process.cwd(), ''))) process.env[k] ??= v
   // .figma/make/deploy-preview passes `--mode development` for cached-preview builds.
   const emitSourcemaps = mode === 'development'
 
@@ -19,6 +21,7 @@ export default defineConfig(({ mode }) => {
     },
     plugins: [
 react(),
+      apiEnDesarrollo(),
       tailwindcss(),
       figmaSiteConfiguration(siteConfiguration),
       figmaErrorOverlayReplay(),
@@ -354,6 +357,47 @@ function figmaMakeKitPlugin(options: { storiesGlob: string | string[] }): Plugin
           res.end(await server.transformIndexHtml(url, HTML_BOOTSTRAP))
         } catch (err) {
           next(err as Error)
+        }
+      })
+    },
+  }
+}
+
+/**
+ * En `pnpm dev` atiende /api con el mismo código de la Vercel Function
+ * (server/app.ts). Necesita DATABASE_URL y ADMIN_PASSWORD en `.env.local`
+ * (se pueden bajar con `vercel env pull .env.local`).
+ */
+function apiEnDesarrollo(): Plugin {
+  return {
+    name: 'cm-api-dev',
+    apply: 'serve',
+    configureServer(server) {
+      server.middlewares.use('/api', async (req, res) => {
+        try {
+          const { atender } = (await server.ssrLoadModule('/server/app.ts')) as typeof import('./server/app')
+          const url = new URL(req.url ?? '/', 'http://localhost')
+          const chunks: Buffer[] = []
+          for await (const c of req) chunks.push(c as Buffer)
+          const texto = Buffer.concat(chunks).toString()
+          const auth = req.headers.authorization
+          const r = await atender({
+            method: req.method ?? 'GET',
+            path: url.pathname,
+            query: Object.fromEntries(url.searchParams),
+            body: texto ? JSON.parse(texto) : undefined,
+            token: auth?.startsWith('Bearer ') ? auth.slice(7) : null,
+          })
+          res.statusCode = r.status
+          res.setHeader('Cache-Control', 'no-store')
+          if (r.status === 204) return res.end()
+          res.setHeader('Content-Type', 'application/json')
+          res.end(JSON.stringify(r.body))
+        } catch (e) {
+          console.error('[api dev]', e)
+          res.statusCode = 500
+          res.setHeader('Content-Type', 'application/json')
+          res.end(JSON.stringify({ code: 'ERROR_INTERNO' }))
         }
       })
     },

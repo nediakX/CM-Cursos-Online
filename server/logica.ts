@@ -1,13 +1,10 @@
 /**
- * Lógica de negocio de la plataforma + almacén de datos.
+ * Lógica de negocio de la plataforma (usuarios, progreso, evaluaciones,
+ * certificados, sitio…). Se ejecuta en el servidor: server/db.ts le entrega
+ * los datos de Postgres con `configurarAlmacen()` y server/auth.ts define
+ * cómo se cifran las contraseñas con `configurarPasswords()`.
  *
- * - En el navegador (modo local, sin VITE_API_URL) guarda todo en localStorage.
- * - En el servidor (api/index.ts) se usa el MISMO código, pero el almacén se
- *   reemplaza con `configurarAlmacen()` para leer y escribir en Postgres, y las
- *   contraseñas se guardan cifradas con `configurarPasswords()`.
- *
- * Por eso este archivo no debe usar APIs exclusivas del navegador fuera del
- * almacén por defecto, y sus imports llevan extensión `.js` (requisito de Node).
+ * Los imports llevan extensión `.js` porque así lo exige Node en las Vercel Functions.
  */
 import type {
   Asistencia,
@@ -30,14 +27,11 @@ import type {
   ContenidoModulo,
   SiteConfig,
   Solicitud,
-} from '../types';
-import { CURSO, EVALUACIONES } from '../data/curso.js';
-import { PREGUNTAS } from '../data/preguntas.js';
-import { CONTENIDO_MODULOS } from '../data/modulos/index.js';
-import { completarSitio } from '../data/sitio.js';
-
-const KEY = 'lms_local_db_v1';
-const PW_OVERRIDE_KEY = 'lms_local_pw'; // versiones anteriores guardaban aquí los cambios de contraseña
+} from '../src/types';
+import { CURSO, EVALUACIONES } from '../src/data/curso.js';
+import { PREGUNTAS } from '../src/data/preguntas.js';
+import { CONTENIDO_MODULOS } from '../src/data/modulos/index.js';
+import { completarSitio } from '../src/data/sitio.js';
 
 export interface CuentaLocal {
   user: User;
@@ -92,56 +86,31 @@ export interface Almacen {
   guardar(db: Db): void;
 }
 
-const almacenNavegador: Almacen = {
-  leer() {
-    try {
-      return { ...vacia(), ...JSON.parse(localStorage.getItem(KEY) ?? '{}') };
-    } catch {
-      return vacia();
-    }
-  },
-  guardar(db) {
-    try {
-      localStorage.setItem(KEY, JSON.stringify(db));
-    } catch {
-      // Almacenamiento lleno (p. ej. imágenes muy pesadas) o bloqueado.
-      throw new Error('ALMACENAMIENTO_LLENO');
-    }
-  },
-};
-
-let almacen: Almacen = almacenNavegador;
+let almacen: Almacen | null = null;
 /** Reemplaza el almacén (lo usa el servidor para trabajar sobre Postgres). */
 export const configurarAlmacen = (a: Almacen): void => {
   almacen = a;
 };
 
-const leer = (): Db => almacen.leer();
-const guardar = (db: Db): void => almacen.guardar(db);
+const usarAlmacen = (): Almacen => {
+  if (!almacen) throw new Error('ALMACEN_NO_CONFIGURADO');
+  return almacen;
+};
+const leer = (): Db => usarAlmacen().leer();
+const guardar = (db: Db): void => usarAlmacen().guardar(db);
 
 // --- Contraseñas ------------------------------------------------------------
-// En el navegador se comparan tal cual (modo demostración). El servidor las
-// reemplaza por un hash seguro y define sus propias cuentas iniciales.
-interface PoliticaPasswords {
+// Las define el servidor (server/auth.ts): hash seguro y cuenta inicial del administrador.
+export interface PoliticaPasswords {
   cifrar(plana: string): string;
   verificar(plana: string, guardada: string): boolean;
   generarTemporal(): string;
   cuentasIniciales(): CuentaLocal[];
 }
-let passwords: PoliticaPasswords = {
-  cifrar: (p) => p,
-  verificar: (p, g) => p === g,
-  generarTemporal: () => `Cm${Math.random().toString(36).slice(2, 8)}${Math.floor(Math.random() * 90 + 10)}!`,
-  cuentasIniciales: () => {
-    let overrides: Record<string, string> = {};
-    try {
-      overrides = JSON.parse(localStorage.getItem(PW_OVERRIDE_KEY) ?? '{}');
-    } catch {
-      /* sin overrides */
-    }
-    return CUENTAS_INICIALES.map((c) => ({ user: { ...c.user }, password: overrides[c.user.id] ?? c.password }));
-  },
+const sinConfigurar = (): never => {
+  throw new Error('PASSWORDS_NO_CONFIGURADAS');
 };
+let passwords: PoliticaPasswords = { cifrar: sinConfigurar, verificar: sinConfigurar, generarTemporal: sinConfigurar, cuentasIniciales: sinConfigurar };
 export const configurarPasswords = (p: Partial<PoliticaPasswords>): void => {
   passwords = { ...passwords, ...p };
 };
@@ -149,41 +118,6 @@ export const configurarPasswords = (p: Partial<PoliticaPasswords>): void => {
 export const idLocal = (): string => `l-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
 // --- Usuarios ---------------------------------------------------------------
-export const CUENTAS_INICIALES: CuentaLocal[] = [
-  {
-    password: 'Admin1234!',
-    user: {
-      id: 'u-admin-1',
-      rut: '111111111',
-      nombres: 'Carlos',
-      apellidos: 'Moll',
-      email: 'carlos.moll@cmingenierias.cl',
-      telefono: '',
-      rol: 'admin',
-      activo: true,
-      debeCambiarPassword: false,
-      cursosAsignados: [],
-      creadoEn: '2024-01-01T00:00:00.000Z',
-    },
-  },
-  {
-    password: 'Alumno1234!',
-    user: {
-      id: 'u-alumno-1',
-      rut: '222222222',
-      nombres: 'Estudiante',
-      apellidos: 'Demo',
-      email: 'estudiante@cmingenierias.cl',
-      telefono: '',
-      rol: 'alumno',
-      activo: true,
-      debeCambiarPassword: false,
-      cursosAsignados: ['curso-1'],
-      creadoEn: '2024-01-01T00:00:00.000Z',
-    },
-  },
-];
-
 export const normalizarRut = (rut: string): string => rut.replace(/[^0-9kK]/g, '').toUpperCase();
 
 function cuentas(db: Db): CuentaLocal[] {

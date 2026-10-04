@@ -1,6 +1,6 @@
 /** Contraseñas cifradas (scrypt) y sesiones firmadas (HMAC-SHA256). */
 import { createHmac, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
-import { CUENTAS_INICIALES, type CuentaLocal } from '../src/services/localStore.js';
+import { normalizarRut, type CuentaLocal } from './logica.js';
 
 export function cifrarPassword(plana: string): string {
   const sal = randomBytes(16);
@@ -23,20 +23,26 @@ export function passwordTemporal(): string {
 }
 
 /**
- * Cuenta inicial del servidor: sólo el administrador, con la contraseña de la
- * variable ADMIN_PASSWORD (las cuentas de demostración del modo local tienen
- * contraseñas públicas y no se crean en producción).
+ * Cuenta inicial: sólo el administrador, con la contraseña de ADMIN_PASSWORD.
+ * Se crea la primera vez que se usa la API (con la base de datos vacía).
  */
 export function cuentasInicialesServidor(): CuentaLocal[] {
   const pw = process.env.ADMIN_PASSWORD;
   if (!pw) throw new Error('FALTA_ADMIN_PASSWORD');
-  const admin = CUENTAS_INICIALES.find((c) => c.user.rol === 'admin')!;
   return [
     {
       password: cifrarPassword(pw),
       user: {
-        ...admin.user,
-        rut: process.env.ADMIN_RUT ? process.env.ADMIN_RUT.replace(/[^0-9kK]/g, '').toUpperCase() : admin.user.rut,
+        id: 'u-admin-1',
+        rut: normalizarRut(process.env.ADMIN_RUT ?? '11.111.111-1'),
+        nombres: 'Carlos',
+        apellidos: 'Moll',
+        email: 'carlos.moll@cmingenierias.cl',
+        telefono: '',
+        rol: 'admin',
+        activo: true,
+        debeCambiarPassword: false,
+        cursosAsignados: [],
         creadoEn: new Date().toISOString(),
       },
     },
