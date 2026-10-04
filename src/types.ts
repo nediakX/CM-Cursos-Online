@@ -14,6 +14,8 @@ export interface User {
   creadoEn: string;
   /** Módulos que el administrador habilitó para el alumno (por defecto sólo el primero). */
   modulosHabilitados?: string[];
+  /** Evaluaciones que el administrador habilitó para el alumno (por defecto, ninguna). */
+  evaluacionesHabilitadas?: string[];
   /** El usuario tiene fotografía cargada (se obtiene con getFoto). */
   tieneFoto?: boolean;
   /** Si el alumno debe verificar su rostro al iniciar sesión (por defecto sí). */

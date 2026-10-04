@@ -51,9 +51,11 @@ Cada alumno sólo puede entrar a los módulos que el administrador le habilitó
 de cada alumno. El servidor bloquea el contenido, el avance y las evaluaciones
 de los módulos no habilitados.
 
-Evaluaciones: la de cada módulo se abre al completar todas sus lecciones; el
-examen parcial, al completar los módulos 1 a 5; los simuladores SEC y el
-examen final, al completar todos los módulos. La diagnóstica está siempre abierta.
+Evaluaciones: cada una debe estar **habilitada por el administrador** para el
+alumno (pestaña Evaluaciones de la misma página, o la ficha del alumno) y,
+además, cumplir sus requisitos: la de cada módulo, todas sus lecciones
+completas; el examen parcial, los módulos 1 a 5; los simuladores SEC y el
+examen final, todos los módulos. La diagnóstica sólo requiere estar habilitada.
 
 ## Fotografía y verificación facial
 

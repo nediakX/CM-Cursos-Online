@@ -333,11 +333,15 @@ export interface FilaHabilitacion {
   rut: string;
   activo: boolean;
   modulosHabilitados: string[];
+  evaluacionesHabilitadas: string[];
   modulos: Record<string, { avance: number; nota: number | null; aprobado: boolean }>;
+  evaluaciones: Record<string, { requisitos: boolean; nota: number | null; aprobado: boolean }>;
 }
 export const getHabilitacion = (): Promise<FilaHabilitacion[]> => get<FilaHabilitacion[]>('/admin/habilitacion');
 export const habilitarModulos = (userId: string, modulosHabilitados: string[]): Promise<User> =>
   patch<User>(`/usuarios/${userId}`, { modulosHabilitados });
+export const habilitarEvaluaciones = (userId: string, evaluacionesHabilitadas: string[]): Promise<User> =>
+  patch<User>(`/usuarios/${userId}`, { evaluacionesHabilitadas });
 
 // ---------------------------------------------------------------------------
 // Fotografías y verificación facial

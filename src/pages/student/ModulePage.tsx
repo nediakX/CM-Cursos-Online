@@ -28,7 +28,7 @@ import { ListaBloques } from '../../components/modulo/Bloques';
 import Calculadora, { NOMBRES_CALCULADORAS } from '../../components/modulo/Calculadoras';
 import PracticaModulo from '../../components/modulo/PracticaModulo';
 import Presentacion from '../../components/modulo/Presentacion';
-import { modulosHabilitados } from '../../utils/evaluaciones';
+import { estadoEvaluacion, modulosHabilitados } from '../../utils/evaluaciones';
 import { getCurso, getProgreso, marcarLeccion, listarConsultas, crearConsulta, listarEvaluaciones, listarIntentos, getContenidoModulo } from '../../services/api';
 import type { CalculadoraId, Consulta, ContenidoModulo, Curso, Evaluacion, Intento, Modulo, Progreso } from '../../types';
 
@@ -217,6 +217,8 @@ export default function ModulePage() {
     new Set((contenido?.lecciones ?? []).flatMap((l) => l.bloques.flatMap((b) => (b.tipo === 'calculadora' ? [b.calculadora] : [])))),
   );
   const siguienteModulo = curso?.modulos.find((m) => m.orden === modulo.orden + 1);
+  const estadoEv = evaluacion && curso ? estadoEvaluacion(evaluacion, curso, progreso, user) : null;
+  const evAbierta = !!estadoEv?.desbloqueada;
 
   const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
     { id: 'lecciones', label: 'Lecciones', icon: <BookOpen size={15} /> },
@@ -392,17 +394,19 @@ export default function ModulePage() {
             {/* Evaluación */}
             <div className={`rounded-xl p-5 border-2 ${todoCompleto ? 'bg-amber-50 border-accent' : 'bg-white border-gray-100 shadow-sm'}`}>
               <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-                <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${todoCompleto ? 'bg-accent' : 'bg-gray-100'}`}>
-                  {todoCompleto ? <Trophy size={22} className="text-primary" /> : <Lock size={20} className="text-gray-500" />}
+                <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${evAbierta ? 'bg-accent' : 'bg-gray-100'}`}>
+                  {evAbierta ? <Trophy size={22} className="text-primary" /> : <Lock size={20} className="text-gray-500" />}
                 </div>
                 <div className="flex-1">
                   <h3 className="font-semibold text-primary">{evaluacion?.nombre ?? 'Evaluación del módulo'}</h3>
                   <p className="text-sm text-gray-600">
-                    {todoCompleto
-                      ? evaluacion
-                        ? `${evaluacion.cantidadPreguntas} preguntas · ${evaluacion.tiempoMinutos} min · nota mínima ${evaluacion.notaMinima.toFixed(1)}`
-                        : 'Completaste todas las lecciones.'
-                      : `Completa las ${lecciones.length - hechas} lecciones restantes para desbloquearla.`}
+                    {!todoCompleto
+                      ? `Completa las ${lecciones.length - hechas} lecciones restantes para desbloquearla.`
+                      : !evaluacion
+                        ? 'Completaste todas las lecciones.'
+                        : evAbierta
+                          ? `${evaluacion.cantidadPreguntas} preguntas · ${evaluacion.tiempoMinutos} min · nota mínima ${evaluacion.notaMinima.toFixed(1)}`
+                          : `Completaste las lecciones. ${estadoEv?.motivo ?? 'Evaluación bloqueada'}.`}
                   </p>
                   {mejorIntento && (
                     <p className={`text-sm font-semibold mt-1 ${mejorIntento.aprobado ? 'text-emerald-600' : 'text-red-700'}`}>
@@ -413,7 +417,7 @@ export default function ModulePage() {
                 <div className="flex flex-col gap-2 shrink-0">
                   {evaluacion && (
                     <button
-                      disabled={!todoCompleto}
+                      disabled={!evAbierta}
                       onClick={() => navigate(`/app/evaluaciones/${evaluacion.id}/rendir`)}
                       className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold bg-primary text-white hover:bg-primary-hover disabled:bg-gray-100 disabled:text-gray-500"
                     >

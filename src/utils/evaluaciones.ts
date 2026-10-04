@@ -22,13 +22,30 @@ export function moduloCompleto(curso: Curso, progreso: Progreso, moduloId: strin
 }
 
 /**
- * Reglas de desbloqueo de evaluaciones (las mismas en la interfaz y en el servidor):
+ * Reglas de desbloqueo de evaluaciones (las mismas en la interfaz y en el servidor).
+ * Toda evaluación debe estar habilitada por el relator para el alumno y, además:
  *  - Diagnóstica: siempre disponible (mide conocimientos previos).
  *  - Evaluación de módulo: el módulo debe estar habilitado y con todas sus lecciones completas.
  *  - Examen parcial: todos los módulos que abarca, completos.
  *  - Simuladores SEC y examen final: todos los módulos del curso completos.
  */
 export function estadoEvaluacion(
+  ev: Evaluacion,
+  curso: Curso,
+  progreso: Progreso,
+  user?: Pick<User, 'rol' | 'modulosHabilitados' | 'evaluacionesHabilitadas'> | null,
+): { desbloqueada: boolean; motivo?: string } {
+  const req = requisitosEvaluacion(ev, curso, progreso, user);
+  if (!req.desbloqueada) return req;
+  // Además de los requisitos, el relator debe habilitar la evaluación para el alumno.
+  if (user && user.rol !== 'admin' && !(user.evaluacionesHabilitadas ?? []).includes(ev.id)) {
+    return { desbloqueada: false, motivo: 'Tu relator aún no habilita esta evaluación' };
+  }
+  return { desbloqueada: true };
+}
+
+/** Requisitos de avance de una evaluación (sin considerar la habilitación del relator). */
+export function requisitosEvaluacion(
   ev: Evaluacion,
   curso: Curso,
   progreso: Progreso,

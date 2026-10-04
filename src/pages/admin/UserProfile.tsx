@@ -7,7 +7,7 @@ import { useToast } from '../../components/ui/Toast';
 import { formatearRut } from '../../utils/rut';
 import Badge from '../../components/ui/Badge';
 import Avatar from '../../components/Avatar';
-import { IdentidadPanel, ModulosAlumnoPanel } from '../../components/admin/PanelesAlumno';
+import { EvaluacionesAlumnoPanel, IdentidadPanel, ModulosAlumnoPanel } from '../../components/admin/PanelesAlumno';
 import type { User } from '../../types';
 
 const TABS = ['Módulos', 'Identidad', 'Progreso', 'Evaluaciones', 'Asistencia', 'Proyecto', 'Certificados'] as const;
@@ -93,7 +93,12 @@ const UserProfile: React.FC = () => {
 
       {/* Tab content */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        {activeTab === 'Módulos' && curso && <ModulosAlumnoPanel usuario={usuario} curso={curso} onCambio={actualizarUsuario} />}
+        {activeTab === 'Módulos' && curso && (
+          <>
+            <ModulosAlumnoPanel usuario={usuario} curso={curso} onCambio={actualizarUsuario} />
+            <EvaluacionesAlumnoPanel usuario={usuario} onCambio={actualizarUsuario} />
+          </>
+        )}
         {activeTab === 'Identidad' && <IdentidadPanel usuario={usuario} onCambio={actualizarUsuario} />}
         {/* Progreso */}
         {activeTab === 'Progreso' && (

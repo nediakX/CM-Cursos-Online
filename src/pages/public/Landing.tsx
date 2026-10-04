@@ -10,6 +10,7 @@ import { useSitio } from '../../context/SiteContext';
 import { useAuth } from '../../context/AuthContext';
 import BrandLogo from '../../components/BrandLogo';
 import { Icono } from '../../components/landing/iconos';
+import DiagramaUnilineal from '../../components/landing/DiagramaUnilineal';
 import {
   IconoFacebook, IconoInstagram, IconoLinkedin, IconoTiktok, IconoWhatsapp, IconoYoutube, enlaceWhatsapp,
 } from '../../components/landing/RedesIconos';
@@ -22,14 +23,48 @@ const Contenedor: React.FC<{ children: React.ReactNode; className?: string }> = 
   <div className={`max-w-6xl mx-auto px-4 sm:px-6 ${className}`}>{children}</div>
 );
 
-function EncabezadoSeccion({ titulo, subtitulo, id, claro = false }: { titulo: string; subtitulo?: string; id: string; claro?: boolean }) {
+function EncabezadoSeccion({ titulo, subtitulo, id, claro = false, centrado = false }: { titulo: string; subtitulo?: string; id: string; claro?: boolean; centrado?: boolean }) {
   return (
-    <div className="max-w-2xl mx-auto text-center mb-12">
-      <h2 id={id} className={`text-3xl sm:text-4xl font-extrabold tracking-tight ${claro ? 'text-white' : 'text-primary'}`}>
+    <div className={`max-w-2xl mb-12 ${centrado ? 'mx-auto text-center' : ''}`}>
+      <h2 id={id} className={`display-sm text-3xl sm:text-[2.6rem] leading-[1.08] text-balance ${claro ? 'text-white' : 'text-primary'}`}>
         {titulo}
       </h2>
-      {subtitulo && <p className={`mt-3 text-lg ${claro ? 'text-white/80' : 'text-gray-600'}`}>{subtitulo}</p>}
+      {subtitulo && <p className={`mt-4 text-lg leading-relaxed ${claro ? 'text-white/80' : 'text-slate-600'}`}>{subtitulo}</p>}
     </div>
+  );
+}
+
+/** true cuando el usuario pidió reducir el movimiento. */
+const sinMovimiento = () => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/** Cifra que cuenta desde 0 al cargar la página ("240 h", "590+", "10"). */
+function Cifra({ valor }: { valor: string }) {
+  const m = valor.match(/^(\D*)(\d[\d.]*)(.*)$/);
+  const objetivo = m ? Number(m[2].replace(/\./g, '')) : NaN;
+  const [n, setN] = useState(() => (sinMovimiento() || Number.isNaN(objetivo) ? objetivo : 0));
+  useEffect(() => {
+    if (Number.isNaN(objetivo) || sinMovimiento()) return;
+    let raf = 0;
+    const inicio = performance.now() + 900; // empieza cuando el diagrama ya se dibujó
+    const dur = 1300;
+    const paso = (t: number) => {
+      const p = Math.min(1, Math.max(0, (t - inicio) / dur));
+      setN(Math.round(objetivo * (1 - Math.pow(1 - p, 3))));
+      if (p < 1) raf = requestAnimationFrame(paso);
+    };
+    raf = requestAnimationFrame(paso);
+    return () => cancelAnimationFrame(raf);
+  }, [objetivo]);
+  if (!m || Number.isNaN(objetivo)) return <>{valor}</>;
+  return (
+    <>
+      <span className="sr-only">{valor}</span>
+      <span aria-hidden="true">
+        {m[1]}
+        {n.toLocaleString('es-CL')}
+        {m[3]}
+      </span>
+    </>
   );
 }
 
@@ -93,7 +128,7 @@ function Cabecera({ visibles }: { visibles: Set<SeccionLandingId> }) {
   const aula = user ? (user.rol === 'admin' ? '/admin' : '/app') : '/login';
 
   return (
-    <header className={`sticky top-0 z-40 bg-primary/95 backdrop-blur border-b ${scrolled ? 'border-white/10 shadow-lg' : 'border-transparent'}`}>
+    <header className={`sticky top-0 z-40 backdrop-blur border-b transition-colors ${scrolled ? 'bg-primary/90 border-white/10 shadow-lg' : 'bg-primary border-transparent'}`}>
       <Contenedor className="flex items-center justify-between h-16 gap-4">
         <Link to="/" aria-label={`${sitio.marca.nombre}, inicio`} className="rounded-lg">
           <BrandLogo tono="dark" />
@@ -112,11 +147,11 @@ function Cabecera({ visibles }: { visibles: Set<SeccionLandingId> }) {
         </nav>
 
         <div className="hidden sm:flex items-center gap-2">
-          <Link to={aula} className="px-4 py-2 rounded-xl text-sm font-semibold text-white hover:bg-white/10">
+          <Link to={aula} className="px-4 py-2 rounded-full text-sm font-semibold text-white hover:bg-white/10">
             {user ? 'Ir a mi aula' : 'Ingresar'}
           </Link>
           {visibles.has('inscripcion') && (
-            <a href="#inscripcion" onClick={(ev) => { ev.preventDefault(); irA('inscripcion'); }} className="px-4 py-2 rounded-xl text-sm font-bold bg-accent text-primary hover:bg-accent-hover">
+            <a href="#inscripcion" onClick={(ev) => { ev.preventDefault(); irA('inscripcion'); }} className="px-5 py-2 rounded-full text-sm font-bold bg-accent text-primary hover:bg-accent-hover">
               Inscríbete
             </a>
           )}
@@ -158,78 +193,49 @@ function Cabecera({ visibles }: { visibles: Set<SeccionLandingId> }) {
 }
 
 // ─── Hero ─────────────────────────────────────────────────────────────────────
-/** Vista del temario real del curso (cuando no hay imagen de portada). */
-function MaquetaCurso({ curso }: { curso: Curso | null }) {
-  const modulos = (curso?.modulos ?? []).slice(0, 5);
-  if (!curso) return null;
-  return (
-    <div className="relative">
-      <div className="absolute -inset-6 bg-accent/20 blur-3xl rounded-full" aria-hidden="true" />
-      <div className="relative bg-white rounded-2xl shadow-2xl p-5 sm:p-6">
-        <div className="flex items-center gap-3 mb-5">
-          <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center">
-            <BookOpen size={20} className="text-accent" aria-hidden="true" />
-          </div>
-          <div className="min-w-0">
-            <p className="text-xs text-gray-500">Temario · {curso.horasTotales} horas</p>
-            <p className="font-bold text-primary truncate">{curso.nombre}</p>
-          </div>
-        </div>
-        <ol className="space-y-2.5">
-          {modulos.map((m) => (
-            <li key={m.id} className="flex items-center gap-3">
-              <span className="w-7 h-7 rounded-full bg-primary/5 text-primary text-xs font-bold flex items-center justify-center shrink-0">{m.orden}</span>
-              <span className="flex-1 min-w-0 text-sm font-medium text-gray-800 truncate">{m.nombre}</span>
-              <span className="text-xs text-gray-500 shrink-0">{m.horas} h</span>
-            </li>
-          ))}
-        </ol>
-        {curso.modulos.length > modulos.length && (
-          <p className="mt-3 text-xs text-gray-500">y {curso.modulos.length - modulos.length} módulos más</p>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function Hero({ curso, mostrarInscripcion, mostrarTemario }: { curso: Curso | null; mostrarInscripcion: boolean; mostrarTemario: boolean }) {
+function Hero({ mostrarInscripcion, mostrarTemario }: { mostrarInscripcion: boolean; mostrarTemario: boolean }) {
   const { sitio } = useSitio();
   const h = sitio.hero;
   return (
     <section aria-labelledby="hero-titulo" className="relative overflow-hidden bg-primary text-white">
-      {/* Fondo decorativo: retícula técnica + brillo */}
+      <div className="plano absolute inset-0 pointer-events-none" aria-hidden="true" />
       <div
-        className="absolute inset-0 opacity-[0.07] pointer-events-none"
-        style={{
-          backgroundImage: 'linear-gradient(white 1px, transparent 1px), linear-gradient(90deg, white 1px, transparent 1px)',
-          backgroundSize: '44px 44px',
-        }}
+        className="absolute inset-0 pointer-events-none"
+        style={{ background: 'radial-gradient(60% 50% at 78% 45%, color-mix(in oklab, var(--color-accent) 16%, transparent), transparent 70%)' }}
         aria-hidden="true"
       />
-      <div className="absolute -top-40 -right-40 w-[520px] h-[520px] rounded-full bg-accent/25 blur-3xl pointer-events-none" aria-hidden="true" />
 
-      <Contenedor className="relative grid grid-cols-1 lg:grid-cols-[1.1fr_0.9fr] gap-12 lg:gap-16 items-center py-16 sm:py-24">
-        <div className="min-w-0">
-          {h.etiqueta && (
-            <p className="inline-flex items-center gap-2 rounded-full bg-white/10 border border-white/15 px-3 py-1 text-sm font-medium text-white">
-              <Sparkles size={14} className="text-accent" aria-hidden="true" />
-              {h.etiqueta}
-            </p>
-          )}
-          <h1 id="hero-titulo" className="mt-5 text-4xl sm:text-5xl lg:text-[3.5rem] font-extrabold tracking-tight leading-[1.08] text-balance">
-            {h.titulo} {h.tituloDestacado && <span className="text-accent">{h.tituloDestacado}</span>}
+      <Contenedor className="relative grid grid-cols-1 lg:grid-cols-[1fr_1.05fr] gap-10 lg:gap-12 items-center pt-12 pb-10 sm:pt-16 lg:pb-12">
+        <div className="entrada min-w-0">
+          {h.etiqueta && <p className="text-accent font-semibold text-base">{h.etiqueta}</p>}
+          <h1 id="hero-titulo" className="display mt-4 text-[2.4rem] sm:text-[3.4rem] lg:text-[3.6rem] text-balance">
+            {h.titulo}
+            {h.tituloDestacado && <span className="block mt-2 text-white/70">{h.tituloDestacado}</span>}
           </h1>
           <p className="mt-6 text-lg text-white/80 max-w-xl leading-relaxed">{h.subtitulo}</p>
 
           <div className="mt-8 flex flex-col sm:flex-row gap-3">
             {mostrarInscripcion && (
-              <a href="#inscripcion" onClick={(e) => { e.preventDefault(); irA('inscripcion'); }} className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-accent text-primary font-bold text-base hover:bg-accent-hover shadow-lg shadow-black/20">
+              <a
+                href="#inscripcion"
+                onClick={(e) => {
+                  e.preventDefault();
+                  irA('inscripcion');
+                }}
+                className="inline-flex items-center justify-center px-7 py-4 rounded-full bg-accent text-primary font-bold text-base hover:bg-accent-hover shadow-[0_10px_30px_-10px_var(--color-accent)]"
+              >
                 {h.ctaPrincipal}
-                <ArrowRight size={18} aria-hidden="true" />
               </a>
             )}
             {mostrarTemario && h.ctaSecundario && (
-              <a href="#temario" onClick={(e) => { e.preventDefault(); irA('temario'); }} className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl border border-white/30 text-white font-semibold text-base hover:bg-white/10">
+              <a
+                href="#temario"
+                onClick={(e) => {
+                  e.preventDefault();
+                  irA('temario');
+                }}
+                className="inline-flex items-center justify-center px-7 py-4 rounded-full border border-white/30 text-white font-semibold text-base hover:bg-white/10"
+              >
                 {h.ctaSecundario}
               </a>
             )}
@@ -247,23 +253,24 @@ function Hero({ curso, mostrarInscripcion, mostrarTemario }: { curso: Curso | nu
           )}
         </div>
 
-        <div className="max-w-md w-full min-w-0 mx-auto lg:mx-0 lg:ml-auto">
-          {h.imagenUrl ? (
-            <img src={h.imagenUrl} alt="" className="w-full rounded-2xl shadow-2xl object-cover aspect-[4/3]" />
-          ) : (
-            <MaquetaCurso curso={curso} />
-          )}
+        <div className="min-w-0 w-full max-w-xl mx-auto lg:max-w-none">
+          {h.imagenUrl ? <img src={h.imagenUrl} alt="" className="w-full rounded-3xl shadow-2xl object-cover aspect-[4/3]" /> : <DiagramaUnilineal />}
         </div>
       </Contenedor>
 
       {h.estadisticas.length > 0 && (
-        <div className="relative border-t border-white/10 bg-black/10">
+        <div className="relative border-t border-white/10">
           <Contenedor>
-            <dl className="grid grid-cols-2 md:grid-cols-4 md:divide-x divide-white/10">
+            <dl className="grid grid-cols-2 md:grid-cols-4">
               {h.estadisticas.map((e, i) => (
-                <div key={i} className={`py-6 px-4 text-center flex flex-col-reverse ${i >= 2 ? 'border-t border-white/10 md:border-t-0' : ''}`}>
-                  <dt className="text-sm text-white/75 mt-1">{e.etiqueta}</dt>
-                  <dd className="text-3xl font-extrabold text-accent">{e.valor}</dd>
+                <div
+                  key={i}
+                  className={`py-7 flex flex-col-reverse ${i % 2 === 1 ? 'pl-6 border-l border-white/10' : 'md:pl-6'} ${i >= 2 ? 'border-t border-white/10 md:border-t-0' : ''} ${i > 0 ? 'md:border-l md:border-white/10' : 'md:pl-0'}`}
+                >
+                  <dt className="text-sm text-white/70 mt-1">{e.etiqueta}</dt>
+                  <dd className="display text-4xl sm:text-5xl text-accent tabular-nums">
+                    <Cifra valor={e.valor} />
+                  </dd>
                 </div>
               ))}
             </dl>
@@ -280,17 +287,19 @@ type Sec = SiteConfig['secciones'][number];
 function Beneficios({ sec }: { sec: Sec }) {
   const { sitio } = useSitio();
   return (
-    <section id="beneficios" aria-labelledby="t-beneficios" className="py-20 sm:py-24 bg-white scroll-mt-16 outline-none">
+    <section id="beneficios" aria-labelledby="t-beneficios" className="py-20 sm:py-28 bg-white scroll-mt-16 outline-none">
       <Contenedor>
         <EncabezadoSeccion id="t-beneficios" titulo={sec.titulo} subtitulo={sec.subtitulo} />
-        <ul className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+        <ul className="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-10 border-t border-slate-200">
           {sitio.beneficios.map((b, i) => (
-            <li key={i} className="group rounded-2xl border border-gray-200 p-6 hover:border-primary/30 hover:shadow-lg transition-shadow bg-white">
-              <span className="w-12 h-12 rounded-xl bg-primary/5 text-primary flex items-center justify-center group-hover:bg-accent group-hover:text-primary transition-colors">
-                <Icono nombre={b.icono} />
+            <li key={i} className="flex gap-4 py-8 border-b border-slate-200">
+              <span className="w-11 h-11 rounded-full bg-primary text-accent flex items-center justify-center shrink-0">
+                <Icono nombre={b.icono} size={20} />
               </span>
-              <h3 className="mt-4 text-lg font-bold text-primary">{b.titulo}</h3>
-              <p className="mt-2 text-gray-600 leading-relaxed">{b.texto}</p>
+              <div>
+                <h3 className="text-lg font-bold text-primary">{b.titulo}</h3>
+                <p className="mt-1.5 text-slate-600 leading-relaxed">{b.texto}</p>
+              </div>
             </li>
           ))}
         </ul>
@@ -299,45 +308,95 @@ function Beneficios({ sec }: { sec: Sec }) {
   );
 }
 
+/** Progreso (0 a 1) del scroll a través de un elemento, para "energizar" el cable del temario. */
+function useProgresoScroll<T extends HTMLElement>(listo: boolean) {
+  const ref = useRef<T>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    if (sinMovimiento()) {
+      el.style.setProperty('--progreso', '1');
+      return;
+    }
+    let raf = 0;
+    const medir = () => {
+      raf = 0;
+      const r = el.getBoundingClientRect();
+      const vh = window.innerHeight;
+      const p = Math.min(1, Math.max(0, (vh * 0.6 - r.top) / r.height));
+      el.style.setProperty('--progreso', p.toFixed(3));
+      el.querySelectorAll<HTMLElement>('[data-nodo]').forEach((n) => {
+        n.classList.toggle('nodo-on', n.getBoundingClientRect().top < vh * 0.6);
+      });
+    };
+    const onScroll = () => {
+      if (!raf) raf = requestAnimationFrame(medir);
+    };
+    medir();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll);
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onScroll);
+      cancelAnimationFrame(raf);
+    };
+  }, [listo]);
+  return ref;
+}
+
 function Temario({ sec, curso }: { sec: Sec; curso: Curso | null }) {
+  const cable = useProgresoScroll<HTMLOListElement>(!!curso);
   if (!curso) return null;
+  const lecciones = curso.modulos.reduce((n, m) => n + m.lecciones.length, 0);
   return (
-    <section id="temario" aria-labelledby="t-temario" className="py-20 sm:py-24 bg-gray-50 scroll-mt-16 outline-none">
-      <Contenedor className="max-w-4xl">
-        <EncabezadoSeccion id="t-temario" titulo={sec.titulo} subtitulo={sec.subtitulo} />
-        <div className="flex flex-wrap justify-center gap-3 mb-8 text-sm">
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-white border border-gray-200 px-3 py-1.5 text-gray-700">
-            <Clock size={16} aria-hidden="true" className="text-primary" /> {curso.horasTotales} horas
-          </span>
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-white border border-gray-200 px-3 py-1.5 text-gray-700">
-            <BadgeCheck size={16} aria-hidden="true" className="text-primary" /> {curso.modulos.length} módulos
-          </span>
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-white border border-gray-200 px-3 py-1.5 text-gray-700">
-            <PlayCircle size={16} aria-hidden="true" className="text-primary" /> Modalidad {curso.modalidad.toLowerCase()}
-          </span>
+    <section id="temario" aria-labelledby="t-temario" className="py-20 sm:py-28 bg-slate-50 scroll-mt-16 outline-none">
+      <Contenedor className="grid lg:grid-cols-[0.8fr_1.2fr] gap-10 lg:gap-16">
+        <div className="lg:sticky lg:top-28 self-start">
+          <EncabezadoSeccion id="t-temario" titulo={sec.titulo} subtitulo={sec.subtitulo} />
+          <dl className="grid grid-cols-3 gap-4 -mt-4 max-w-sm">
+            {[
+              { v: `${curso.horasTotales}`, e: 'horas' },
+              { v: `${curso.modulos.length}`, e: 'módulos' },
+              { v: `${lecciones}`, e: 'lecciones' },
+            ].map((x) => (
+              <div key={x.e} className="flex flex-col-reverse">
+                <dt className="text-sm text-slate-600">{x.e}</dt>
+                <dd className="display text-3xl text-primary">{x.v}</dd>
+              </div>
+            ))}
+          </dl>
         </div>
-        <ol className="space-y-3">
+
+        <ol ref={cable} className="cable-temario relative space-y-3">
+          {/* Cable que se energiza al bajar */}
+          <span className="absolute left-[21px] top-6 bottom-6 w-[3px] rounded bg-slate-200" aria-hidden="true">
+            <span className="relleno absolute inset-0 rounded bg-accent transition-transform duration-150" />
+          </span>
           {curso.modulos.map((m) => (
-            <li key={m.id}>
-              <details className="group bg-white rounded-2xl border border-gray-200 open:shadow-md">
-                <summary className="flex items-center gap-4 p-5 cursor-pointer list-none [&::-webkit-details-marker]:hidden rounded-2xl">
-                  <span className="w-11 h-11 rounded-xl bg-primary text-white font-bold flex items-center justify-center shrink-0" aria-hidden="true">
-                    {String(m.orden).padStart(2, '0')}
+            <li key={m.id} className="relative">
+              <details className="group pl-14">
+                <summary className="flex items-center gap-4 py-3 pr-3 cursor-pointer list-none [&::-webkit-details-marker]:hidden rounded-xl">
+                  <span
+                    data-nodo
+                    className="absolute left-0 top-2.5 w-[45px] h-[45px] rounded-full border-2 border-slate-300 bg-white text-primary font-extrabold flex items-center justify-center transition-colors duration-300"
+                    aria-hidden="true"
+                  >
+                    {m.orden}
                   </span>
                   <span className="flex-1 min-w-0">
                     <span className="sr-only">Módulo {m.orden}: </span>
-                    <span className="block font-semibold text-gray-900">{m.nombre}</span>
-                    <span className="block text-sm text-gray-600 mt-0.5">
-                      {m.lecciones.length} lecciones{m.horas ? ` · ${m.horas} h` : ''}
+                    <span className="block font-bold text-lg text-primary leading-snug">{m.nombre}</span>
+                    <span className="block text-sm text-slate-600 mt-0.5">
+                      {m.lecciones.length} lecciones{m.horas ? `, ${m.horas} horas` : ''}
                     </span>
                   </span>
-                  <ChevronDown size={20} className="text-gray-500 shrink-0 transition-transform group-open:rotate-180" aria-hidden="true" />
+                  <ChevronDown size={20} className="text-slate-500 shrink-0 transition-transform group-open:rotate-180" aria-hidden="true" />
                 </summary>
-                <div className="px-5 pb-5 sm:pl-20">
-                  {m.objetivo && <p className="text-gray-700 mb-3">{m.objetivo}</p>}
+                <div className="pb-5 pr-3">
+                  {m.objetivo && <p className="text-slate-700 mb-3 leading-relaxed">{m.objetivo}</p>}
                   <ul className="grid sm:grid-cols-2 gap-x-6 gap-y-2">
                     {m.lecciones.map((l) => (
-                      <li key={l.id} className="flex items-start gap-2 text-sm text-gray-700">
+                      <li key={l.id} className="flex items-start gap-2 text-sm text-slate-700">
                         <CheckCircle2 size={16} className="text-emerald-600 shrink-0 mt-0.5" aria-hidden="true" />
                         {l.titulo}
                       </li>
@@ -355,24 +414,22 @@ function Temario({ sec, curso }: { sec: Sec; curso: Curso | null }) {
 
 function Metodologia({ sec }: { sec: Sec }) {
   const { sitio } = useSitio();
+  const n = sitio.metodologia.length;
   return (
-    <section id="metodologia" aria-labelledby="t-metodologia" className="py-20 sm:py-24 bg-white scroll-mt-16 outline-none">
+    <section id="metodologia" aria-labelledby="t-metodologia" className="py-20 sm:py-28 bg-white scroll-mt-16 outline-none">
       <Contenedor>
         <EncabezadoSeccion id="t-metodologia" titulo={sec.titulo} subtitulo={sec.subtitulo} />
-        <ol className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <ol className={`relative grid gap-10 sm:grid-cols-2 ${n >= 4 ? 'lg:grid-cols-4' : 'lg:grid-cols-3'}`}>
+          {/* Conductor que une los pasos */}
+          <span className="hidden lg:block absolute top-7 left-7 right-7 h-[2px] bg-gradient-to-r from-accent via-accent/50 to-slate-200" aria-hidden="true" />
           {sitio.metodologia.map((p, i) => (
-            <li key={i} className="relative text-center px-2">
-              <span className="relative mx-auto w-16 h-16 rounded-2xl bg-primary text-accent flex items-center justify-center shadow-lg">
-                <Icono nombre={p.icono} size={26} />
-                <span className="absolute -top-2 -right-2 w-7 h-7 rounded-full bg-accent text-primary text-sm font-extrabold flex items-center justify-center" aria-hidden="true">
-                  {i + 1}
-                </span>
+            <li key={i} className="relative">
+              <span className="relative w-14 h-14 rounded-full bg-primary text-accent flex items-center justify-center ring-8 ring-white">
+                <Icono nombre={p.icono} size={24} />
               </span>
-              <h3 className="mt-5 text-lg font-bold text-primary">
-                <span className="sr-only">Paso {i + 1}: </span>
-                {p.titulo}
-              </h3>
-              <p className="mt-2 text-gray-600">{p.texto}</p>
+              <p className="mt-5 text-sm font-semibold text-accent-ink">Paso {i + 1}</p>
+              <h3 className="mt-1 text-xl font-bold text-primary">{p.titulo}</h3>
+              <p className="mt-2 text-slate-600 leading-relaxed">{p.texto}</p>
             </li>
           ))}
         </ol>
@@ -386,25 +443,25 @@ function Instructor({ sec }: { sec: Sec }) {
   const ins = sitio.instructor;
   const ini = iniciales(ins.nombre);
   return (
-    <section id="instructor" aria-labelledby="t-instructor" className="py-20 sm:py-24 bg-gray-50 scroll-mt-16 outline-none">
+    <section id="instructor" aria-labelledby="t-instructor" className="py-20 sm:py-28 bg-slate-50 scroll-mt-16 outline-none">
       <Contenedor className="max-w-5xl">
         <EncabezadoSeccion id="t-instructor" titulo={sec.titulo} subtitulo={sec.subtitulo} />
-        <div className="grid md:grid-cols-[260px_1fr] gap-10 items-center bg-white rounded-3xl border border-gray-200 p-6 sm:p-10">
+        <div className="grid md:grid-cols-[280px_1fr] gap-10 items-center">
           {ins.fotoUrl ? (
-            <img src={ins.fotoUrl} alt={`Fotografía de ${ins.nombre}`} className="w-full aspect-square object-cover rounded-2xl" />
+            <img src={ins.fotoUrl} alt={`Fotografía de ${ins.nombre}`} className="w-full aspect-square object-cover rounded-[2rem]" />
           ) : (
-            <div className="w-full aspect-square rounded-2xl bg-primary flex items-center justify-center text-6xl font-extrabold text-accent" aria-hidden="true">
+            <div className="plano w-full aspect-square rounded-[2rem] bg-primary flex items-center justify-center text-7xl display text-accent" aria-hidden="true">
               {ini}
             </div>
           )}
           <div>
-            <h3 className="text-2xl font-bold text-primary">{ins.nombre}</h3>
+            <h3 className="display-sm text-3xl text-primary">{ins.nombre}</h3>
             <p className="text-accent-ink font-semibold mt-1">{ins.cargo}</p>
             <p className="mt-4 text-gray-700 leading-relaxed whitespace-pre-line">{ins.bio}</p>
             {ins.credenciales.length > 0 && (
               <ul className="mt-6 flex flex-wrap gap-2">
                 {ins.credenciales.map((c, i) => (
-                  <li key={i} className="inline-flex items-center gap-1.5 rounded-full bg-primary/5 text-primary px-3 py-1.5 text-sm font-medium">
+                  <li key={i} className="inline-flex items-center gap-1.5 rounded-full bg-white border border-slate-200 text-primary px-3 py-1.5 text-sm font-medium">
                     <ShieldCheck size={16} aria-hidden="true" /> {c}
                   </li>
                 ))}
@@ -455,21 +512,21 @@ function Precios({ sec, onElegir }: { sec: Sec; onElegir: (planId: string) => vo
   const { sitio } = useSitio();
   const planes = sitio.planes;
   return (
-    <section id="precios" aria-labelledby="t-precios" className="py-20 sm:py-24 bg-white scroll-mt-16 outline-none">
+    <section id="precios" aria-labelledby="t-precios" className="py-20 sm:py-28 bg-white scroll-mt-16 outline-none">
       <Contenedor>
-        <EncabezadoSeccion id="t-precios" titulo={sec.titulo} subtitulo={sec.subtitulo} />
+        <EncabezadoSeccion id="t-precios" titulo={sec.titulo} subtitulo={sec.subtitulo} centrado />
         <ul className={`grid gap-6 mx-auto ${planes.length === 1 ? 'max-w-md' : planes.length === 2 ? 'md:grid-cols-2 max-w-4xl' : 'md:grid-cols-2 lg:grid-cols-3'}`}>
           {planes.map((p) => (
             <li
               key={p.id}
-              className={`relative flex flex-col rounded-3xl p-7 sm:p-8 ${p.destacado ? 'bg-primary text-white shadow-2xl ring-2 ring-accent lg:-my-2' : 'bg-white border border-gray-200'}`}
+              className={`relative flex flex-col rounded-[2rem] p-8 sm:p-10 ${p.destacado ? 'plano bg-primary text-white shadow-2xl' : 'bg-slate-50 border border-slate-200'}`}
             >
               {p.destacado && (
-                <p className="absolute -top-3.5 left-1/2 -translate-x-1/2 rounded-full bg-accent text-primary text-xs font-extrabold uppercase tracking-wide px-3 py-1.5 whitespace-nowrap">
-                  Más elegido
+                <p className="absolute top-8 right-8 rounded-full bg-accent text-primary text-xs font-bold px-3 py-1.5 whitespace-nowrap">
+                  Recomendado
                 </p>
               )}
-              <h3 className={`text-xl font-bold ${p.destacado ? 'text-white' : 'text-primary'}`}>{p.nombre}</h3>
+              <h3 className={`display-sm text-2xl pr-28 ${p.destacado ? 'text-white' : 'text-primary'}`}>{p.nombre}</h3>
               <p className={`mt-2 text-sm ${p.destacado ? 'text-white/80' : 'text-gray-600'}`}>{p.descripcion}</p>
               <p className="mt-6 flex items-baseline flex-wrap gap-x-2">
                 {p.precioAnterior && (
@@ -477,7 +534,7 @@ function Precios({ sec, onElegir }: { sec: Sec; onElegir: (planId: string) => vo
                     <span className="sr-only">Antes </span>{p.precioAnterior}
                   </span>
                 )}
-                <span className="text-4xl font-extrabold tracking-tight">
+                <span className="display text-5xl">
                   {p.precioAnterior && <span className="sr-only">ahora </span>}
                   {p.precio}
                 </span>
@@ -496,21 +553,19 @@ function Precios({ sec, onElegir }: { sec: Sec; onElegir: (planId: string) => vo
                   href={p.urlPago}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className={`mt-8 inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl font-bold ${p.destacado ? 'bg-accent text-primary hover:bg-accent-hover' : 'bg-primary text-white hover:bg-primary-hover'}`}
+                  className={`mt-8 inline-flex items-center justify-center gap-2 px-6 py-4 rounded-full font-bold ${p.destacado ? 'bg-accent text-primary hover:bg-accent-hover' : 'bg-primary text-white hover:bg-primary-hover'}`}
                 >
                   {p.textoBoton}
                   <span className="sr-only"> (abre el pago en una pestaña nueva)</span>
-                  <ArrowRight size={18} aria-hidden="true" />
                 </a>
               ) : (
                 <button
                   type="button"
                   onClick={() => onElegir(p.id)}
-                  className={`mt-8 inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl font-bold ${p.destacado ? 'bg-accent text-primary hover:bg-accent-hover' : 'bg-primary text-white hover:bg-primary-hover'}`}
+                  className={`mt-8 inline-flex items-center justify-center gap-2 px-6 py-4 rounded-full font-bold ${p.destacado ? 'bg-accent text-primary hover:bg-accent-hover' : 'bg-primary text-white hover:bg-primary-hover'}`}
                 >
                   {p.textoBoton}
                   <span className="sr-only">: {p.nombre}</span>
-                  <ArrowRight size={18} aria-hidden="true" />
                 </button>
               )}
             </li>
@@ -530,17 +585,17 @@ function Precios({ sec, onElegir }: { sec: Sec; onElegir: (planId: string) => vo
 function Faq({ sec }: { sec: Sec }) {
   const { sitio } = useSitio();
   return (
-    <section id="faq" aria-labelledby="t-faq" className="py-20 sm:py-24 bg-gray-50 scroll-mt-16 outline-none">
-      <Contenedor className="max-w-3xl">
+    <section id="faq" aria-labelledby="t-faq" className="py-20 sm:py-28 bg-slate-50 scroll-mt-16 outline-none">
+      <Contenedor className="grid lg:grid-cols-[0.8fr_1.2fr] gap-10 lg:gap-16">
         <EncabezadoSeccion id="t-faq" titulo={sec.titulo} subtitulo={sec.subtitulo} />
-        <div className="space-y-3">
+        <div className="border-t border-slate-300">
           {sitio.faq.map((f, i) => (
-            <details key={i} className="group bg-white rounded-2xl border border-gray-200">
-              <summary className="flex items-center justify-between gap-4 p-5 cursor-pointer list-none [&::-webkit-details-marker]:hidden font-semibold text-gray-900 rounded-2xl">
+            <details key={i} className="group border-b border-slate-300">
+              <summary className="flex items-center justify-between gap-4 py-5 cursor-pointer list-none [&::-webkit-details-marker]:hidden font-semibold text-lg text-primary rounded-lg">
                 {f.pregunta}
                 <ChevronDown size={20} className="text-gray-500 shrink-0 transition-transform group-open:rotate-180" aria-hidden="true" />
               </summary>
-              <p className="px-5 pb-5 text-gray-700 leading-relaxed whitespace-pre-line">{f.respuesta}</p>
+              <p className="pb-6 pr-10 text-slate-700 leading-relaxed whitespace-pre-line">{f.respuesta}</p>
             </details>
           ))}
         </div>
@@ -625,11 +680,11 @@ function Inscripcion({ sec, planInicial }: { sec: Sec; planInicial: string }) {
   const aria = (k: keyof Campos) => ({ 'aria-invalid': !!errores[k] || undefined, 'aria-describedby': errores[k] ? `${uid}-${k}-err` : undefined });
 
   return (
-    <section id="inscripcion" aria-labelledby="t-inscripcion" className="py-20 sm:py-24 bg-primary relative overflow-hidden scroll-mt-16 outline-none">
-      <div className="absolute -bottom-48 -left-48 w-[420px] h-[420px] rounded-full bg-accent/10 blur-3xl pointer-events-none" aria-hidden="true" />
+    <section id="inscripcion" aria-labelledby="t-inscripcion" className="py-20 sm:py-28 bg-primary relative overflow-hidden scroll-mt-16 outline-none">
+      <div className="plano absolute inset-0 pointer-events-none" aria-hidden="true" />
       <Contenedor className="relative grid grid-cols-1 lg:grid-cols-[0.9fr_1.1fr] gap-12 items-start">
         <div className="text-white min-w-0">
-          <h2 id="t-inscripcion" className="text-3xl sm:text-4xl font-extrabold tracking-tight">{ins.titulo || sec.titulo}</h2>
+          <h2 id="t-inscripcion" className="display text-4xl sm:text-5xl text-balance">{ins.titulo || sec.titulo}</h2>
           <p className="mt-4 text-lg text-white/80 leading-relaxed">{ins.texto}</p>
 
           <ul className="mt-8 space-y-4">
@@ -663,7 +718,7 @@ function Inscripcion({ sec, planInicial }: { sec: Sec; planInicial: string }) {
           </ul>
         </div>
 
-        <div className="bg-white rounded-3xl shadow-2xl p-6 sm:p-8">
+        <div className="bg-white rounded-[2rem] shadow-2xl p-6 sm:p-9">
           {enviado ? (
             <div ref={exitoRef} tabIndex={-1} role="status" className="text-center py-8 outline-none">
               <span className="mx-auto w-16 h-16 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center">
@@ -740,7 +795,7 @@ function Inscripcion({ sec, planInicial }: { sec: Sec; planInicial: string }) {
               {errorGeneral && (
                 <p role="alert" className="rounded-xl bg-red-50 border border-red-200 text-red-800 px-4 py-3 text-sm">{errorGeneral}</p>
               )}
-              <button type="submit" disabled={enviando} className="w-full inline-flex items-center justify-center gap-2 px-6 py-4 rounded-xl bg-accent text-primary font-extrabold text-base hover:bg-accent-hover disabled:opacity-60">
+              <button type="submit" disabled={enviando} className="w-full inline-flex items-center justify-center gap-2 px-6 py-4 rounded-full bg-accent text-primary font-extrabold text-base hover:bg-accent-hover disabled:opacity-60">
                 {enviando ? <Loader2 size={20} className="animate-spin" aria-hidden="true" /> : null}
                 {enviando ? 'Enviando…' : ins.textoBoton}
               </button>
@@ -765,11 +820,11 @@ function Pie() {
     { url: r.tiktok, label: 'TikTok', Icon: IconoTiktok },
   ].filter((x) => x.url);
   return (
-    <footer className="bg-gray-950 text-gray-300">
+    <footer className="bg-primary text-white/70 border-t border-white/10">
       <Contenedor className="py-14 grid gap-10 md:grid-cols-[1.4fr_1fr_1fr]">
         <div>
           <BrandLogo tono="dark" size="lg" />
-          {sitio.pie.texto && <p className="mt-4 max-w-sm text-gray-500">{sitio.pie.texto}</p>}
+          {sitio.pie.texto && <p className="mt-4 max-w-sm text-white/60">{sitio.pie.texto}</p>}
           {redes.length > 0 && (
             <ul className="mt-6 flex gap-2" aria-label="Redes sociales">
               {redes.map(({ url, label, Icon }) => (
@@ -783,7 +838,7 @@ function Pie() {
           )}
         </div>
         <nav aria-label="Enlaces del pie">
-          <h2 className="text-sm font-semibold text-white uppercase tracking-wide">Plataforma</h2>
+          <h2 className="text-base font-semibold text-white">Plataforma</h2>
           <ul className="mt-4 space-y-2.5">
             <li><Link to="/login" className="hover:text-white hover:underline">Ingresar al aula</Link></li>
             <li><Link to="/verificar-certificado" className="hover:text-white hover:underline">Verificar un certificado</Link></li>
@@ -791,7 +846,7 @@ function Pie() {
           </ul>
         </nav>
         <div>
-          <h2 className="text-sm font-semibold text-white uppercase tracking-wide">Contacto</h2>
+          <h2 className="text-base font-semibold text-white">Contacto</h2>
           <ul className="mt-4 space-y-2.5">
             {c.email && <li className="flex items-center gap-2"><Mail size={16} aria-hidden="true" /><a href={`mailto:${c.email}`} className="hover:text-white hover:underline">{c.email}</a></li>}
             {c.telefono && <li className="flex items-center gap-2"><Phone size={16} aria-hidden="true" /><a href={`tel:${c.telefono.replace(/\s/g, '')}`} className="hover:text-white hover:underline">{c.telefono}</a></li>}
@@ -800,7 +855,7 @@ function Pie() {
         </div>
       </Contenedor>
       <div className="border-t border-white/10">
-        <Contenedor className="py-6 text-sm text-gray-500 flex flex-col sm:flex-row gap-2 justify-between">
+        <Contenedor className="py-6 text-sm text-white/50 flex flex-col sm:flex-row gap-2 justify-between">
           <p>© {new Date().getFullYear()} {sitio.marca.nombre} {sitio.marca.subtitulo}</p>
         </Contenedor>
       </div>
@@ -844,7 +899,7 @@ export default function Landing() {
   };
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="landing min-h-screen bg-white">
       <a href="#contenido" className="skip-link">Saltar al contenido</a>
 
       {sitio.anuncio.activo && sitio.anuncio.texto && (
@@ -871,7 +926,7 @@ export default function Landing() {
       <Cabecera visibles={visibles} />
 
       <main id="contenido" tabIndex={-1} className="outline-none">
-        <Hero curso={curso} mostrarInscripcion={visibles.has('inscripcion')} mostrarTemario={visibles.has('temario')} />
+        <Hero mostrarInscripcion={visibles.has('inscripcion')} mostrarTemario={visibles.has('temario')} />
         {sitio.secciones.filter((s) => s.visible).map(render)}
       </main>
 

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Download } from 'lucide-react';
+import { FileSpreadsheet, Loader2 } from 'lucide-react';
 import { exportarReporte } from '../../services/api';
 import { useToast } from '../../components/ui/Toast';
 
@@ -11,17 +11,6 @@ const TABS: { key: ReporteTipo; label: string }[] = [
   { key: 'asistencia', label: 'Asistencia' },
 ];
 
-const downloadCSV = (data: Record<string, unknown>[], filename: string) => {
-  if (!data.length) return;
-  const headers = Object.keys(data[0]).join(',');
-  const rows = data.map(r => Object.values(r).map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
-  const blob = new Blob(['\uFEFF' + headers + '\n' + rows], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = filename; a.click();
-  URL.revokeObjectURL(url);
-};
-
 const Reports: React.FC = () => {
   const { toast } = useToast();
   const [tab, setTab] = useState<ReporteTipo>('notas');
@@ -29,9 +18,6 @@ const Reports: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
 
-  // Date filters
-  const [fechaDesde, setFechaDesde] = useState('2024-01-01');
-  const [fechaHasta, setFechaHasta] = useState(new Date().toISOString().slice(0, 10));
 
   const fetchData = async () => {
     setLoading(true);
@@ -50,11 +36,11 @@ const Reports: React.FC = () => {
   const handleExport = async () => {
     setExporting(true);
     try {
-      const result = await exportarReporte(tab);
-      downloadCSV(result, `reporte_${tab}_${new Date().toISOString().slice(0, 10)}.csv`);
-      toast('Reporte exportado correctamente.', 'success');
+      const { exportarReportesExcel } = await import('../../services/exportarReportes');
+      await exportarReportesExcel();
+      toast('Excel generado con los tres reportes.', 'success');
     } catch {
-      toast('Error al exportar reporte.', 'error');
+      toast('Error al generar el Excel.', 'error');
     } finally {
       setExporting(false);
     }
@@ -67,15 +53,15 @@ const Reports: React.FC = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-primary">Reportes</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Generación y exportación de reportes</p>
+          <p className="text-sm text-gray-500 mt-0.5">Notas, avance y asistencia de los alumnos. El Excel incluye un resumen y los tres reportes.</p>
         </div>
         <button
           onClick={handleExport}
-          disabled={exporting || data.length === 0}
-          className="flex items-center gap-2 px-4 py-2 bg-accent text-white rounded-lg text-sm font-medium hover:bg-accent-hover transition-colors disabled:opacity-50"
+          disabled={exporting}
+          className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary-hover transition-colors disabled:opacity-50"
         >
-          <Download size={15} />
-          {exporting ? 'Exportando…' : 'Exportar CSV'}
+          {exporting ? <Loader2 size={15} className="animate-spin" /> : <FileSpreadsheet size={15} />}
+          {exporting ? 'Generando…' : 'Exportar Excel'}
         </button>
       </div>
 
@@ -96,38 +82,7 @@ const Reports: React.FC = () => {
         ))}
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-wrap gap-4 items-end bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
-        <div>
-          <label htmlFor="fecha-desde" className="block text-xs font-medium text-gray-600 mb-1">Fecha Desde</label>
-          <input
-            id="fecha-desde"
-            type="date"
-            value={fechaDesde}
-            onChange={(e) => setFechaDesde(e.target.value)}
-            className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-          />
-        </div>
-        <div>
-          <label htmlFor="fecha-hasta" className="block text-xs font-medium text-gray-600 mb-1">Fecha Hasta</label>
-          <input
-            id="fecha-hasta"
-            type="date"
-            value={fechaHasta}
-            onChange={(e) => setFechaHasta(e.target.value)}
-            className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-          />
-        </div>
-        <button
-          onClick={fetchData}
-          className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary-hover transition-colors"
-        >
-          Aplicar Filtros
-        </button>
-        <p className="text-xs text-gray-500 self-center">
-          {data.length} fila(s) en el reporte actual
-        </p>
-      </div>
+      <p className="text-xs text-gray-500 -mt-2">{data.length} fila(s) en este reporte</p>
 
       {/* Preview table */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">

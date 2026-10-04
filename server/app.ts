@@ -118,12 +118,13 @@ const str = (v: unknown): string => (typeof v === 'string' ? v : '');
 const bool = (v: string | undefined): boolean | undefined => (v === 'true' ? true : v === 'false' ? false : undefined);
 
 const CAMPOS_USUARIO = [
-  'rut', 'nombres', 'apellidos', 'email', 'telefono', 'rol', 'activo', 'debeCambiarPassword', 'cursosAsignados', 'modulosHabilitados', 'requiereRostro',
+  'rut', 'nombres', 'apellidos', 'email', 'telefono', 'rol', 'activo', 'debeCambiarPassword', 'cursosAsignados', 'modulosHabilitados', 'evaluacionesHabilitadas', 'requiereRostro',
 ] as const;
 const camposUsuario = (data: Record<string, unknown>, permitidos: readonly string[] = CAMPOS_USUARIO): Partial<User> => {
   const d = Object.fromEntries(Object.entries(data).filter(([k]) => permitidos.includes(k))) as Partial<User>;
-  if (d.modulosHabilitados !== undefined && !(Array.isArray(d.modulosHabilitados) && d.modulosHabilitados.every((x) => typeof x === 'string'))) {
-    throw new ErrorHttp(400, 'DATOS_INVALIDOS');
+  for (const k of ['modulosHabilitados', 'evaluacionesHabilitadas'] as const) {
+    const v = d[k];
+    if (v !== undefined && !(Array.isArray(v) && v.every((x) => typeof x === 'string'))) throw new ErrorHttp(400, 'DATOS_INVALIDOS');
   }
   if (d.requiereRostro !== undefined && typeof d.requiereRostro !== 'boolean') throw new ErrorHttp(400, 'DATOS_INVALIDOS');
   return d;

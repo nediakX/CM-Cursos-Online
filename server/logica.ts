@@ -32,7 +32,7 @@ import { CURSO, EVALUACIONES } from '../src/data/curso.js';
 import { PREGUNTAS } from '../src/data/preguntas.js';
 import { CONTENIDO_MODULOS } from '../src/data/modulos/index.js';
 import { completarSitio } from '../src/data/sitio.js';
-import { estadoEvaluacion, modulosHabilitados as modulosDe, mejorIntento } from '../src/utils/evaluaciones.js';
+import { estadoEvaluacion, modulosHabilitados as modulosDe, mejorIntento, requisitosEvaluacion } from '../src/utils/evaluaciones.js';
 import { validarRut } from '../src/utils/rut.js';
 
 export interface CuentaLocal {
@@ -183,7 +183,10 @@ export const crearUsuario = (data: Partial<User> & { password: string }): User =
     cursosAsignados: data.cursosAsignados ?? [CURSO.id],
     creadoEn: new Date().toISOString(),
     ...((data.rol ?? 'alumno') === 'alumno'
-      ? { modulosHabilitados: data.modulosHabilitados ?? [CURSO.modulos[0].id], requiereRostro: data.requiereRostro ?? true, rostroRegistrado: false, tieneFoto: false }
+      ? {
+          modulosHabilitados: data.modulosHabilitados ?? [CURSO.modulos[0].id],
+          evaluacionesHabilitadas: data.evaluacionesHabilitadas ?? [],
+          requiereRostro: data.requiereRostro ?? true, rostroRegistrado: false, tieneFoto: false }
       : {}),
   };
   lista.push({ user, password: passwords.cifrar(data.password) });
@@ -381,10 +384,14 @@ export const getHabilitacion = (): {
   rut: string;
   activo: boolean;
   modulosHabilitados: string[];
+  evaluacionesHabilitadas: string[];
   modulos: Record<string, { avance: number; nota: number | null; aprobado: boolean }>;
+  /** Por evaluación: si el alumno cumple los requisitos de avance, y su mejor nota. */
+  evaluaciones: Record<string, { requisitos: boolean; nota: number | null; aprobado: boolean }>;
 }[] => {
   const curso = getCurso(CURSO.id);
-  const evs = listarEvaluaciones().filter((e) => e.tipo === 'modulo' && e.moduloId);
+  const todas = listarEvaluaciones();
+  const evs = todas.filter((e) => e.tipo === 'modulo' && e.moduloId);
   return todosLosUsuarios()
     .filter((u) => u.rol === 'alumno')
     .map((u) => {
@@ -399,7 +406,22 @@ export const getHabilitacion = (): {
           return [m.id, { avance, nota: mejor?.nota ?? null, aprobado: !!mejor?.aprobado }];
         }),
       );
-      return { userId: u.id, nombre: `${u.nombres} ${u.apellidos}`, rut: u.rut, activo: u.activo, modulosHabilitados: [...modulosDe(u, curso)], modulos };
+      const evaluaciones = Object.fromEntries(
+        todas.map((e) => {
+          const mejor = mejorIntento(intentos, e.id);
+          return [e.id, { requisitos: requisitosEvaluacion(e, curso, prog, u).desbloqueada, nota: mejor?.nota ?? null, aprobado: !!mejor?.aprobado }];
+        }),
+      );
+      return {
+        userId: u.id,
+        nombre: `${u.nombres} ${u.apellidos}`,
+        rut: u.rut,
+        activo: u.activo,
+        modulosHabilitados: [...modulosDe(u, curso)],
+        evaluacionesHabilitadas: u.evaluacionesHabilitadas ?? [],
+        modulos,
+        evaluaciones,
+      };
     });
 };
 

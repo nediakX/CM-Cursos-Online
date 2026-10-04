@@ -37,7 +37,7 @@ const GRUPOS: { titulo: string; items: NavItem[] }[] = [
     items: [
       { to: '/admin/consultas', icon: <MessageSquare size={18} />, label: 'Consultas' },
       { to: '/admin/proyectos', icon: <FolderOpen size={18} />, label: 'Proyectos' },
-      { to: '/admin/modulos', icon: <LockOpen size={18} />, label: 'Habilitar módulos' },
+      { to: '/admin/modulos', icon: <LockOpen size={18} />, label: 'Módulos y evaluaciones' },
       { to: '/admin/ingresos', icon: <LogIn size={18} />, label: 'Registro de ingresos' },
       { to: '/admin/asistencia', icon: <Calendar size={18} />, label: 'Asistencia' },
       { to: '/admin/certificados', icon: <Award size={18} />, label: 'Certificados' },
